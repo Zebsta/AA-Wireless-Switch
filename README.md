@@ -6,6 +6,32 @@ Current state: read-only diagnostic APK. It helps find where the Android Auto
 wireless checkbox stores its state by comparing settings snapshots before and
 after a manual toggle.
 
+## Current findings
+
+The Android Auto Wireless checkbox changes the user-0 component state of:
+
+```text
+com.google.android.projection.gearhead/com.google.android.apps.auto.wireless.bluetooth.WifiBluetoothReceiver
+```
+
+Observed mapping:
+
+```text
+enabled  = Android Auto Wireless enabled
+disabled = Android Auto Wireless disabled
+```
+
+Direct ADB shell control is blocked on the tested Samsung Android 16 device:
+
+```text
+java.lang.SecurityException: Shell cannot change component state
+```
+
+Because Shizuku normally executes with shell-level privileges, this also rules
+out a Shizuku implementation based on `pm enable` / `pm disable-user` for this
+component. Remaining implementation paths are root/system privileges or
+Accessibility automation of the Android Auto settings UI.
+
 ## Safety
 
 The diagnostic app does not request Android permissions and does not write
