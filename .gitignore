@@ -30,3 +30,4 @@ tmp/
 artifacts/
 captures/
 reports/
+scripts/adb-*/

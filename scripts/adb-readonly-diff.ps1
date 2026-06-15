@@ -13,6 +13,8 @@ if ([string]::IsNullOrWhiteSpace($OutDir)) {
 $BeforeDir = Join-Path $OutDir "before"
 $AfterDir = Join-Path $OutDir "after"
 $Report = Join-Path $OutDir "report.txt"
+$AndroidAutoPackage = "com.google.android.projection.gearhead"
+$WirelessReceiver = "com.google.android.apps.auto.wireless.bluetooth.WifiBluetoothReceiver"
 
 New-Item -ItemType Directory -Force -Path $BeforeDir, $AfterDir | Out-Null
 
@@ -63,23 +65,60 @@ function Capture {
 
     Run-AdbToFile (Join-Path $Dir "device.txt") @("shell", "getprop", "ro.product.manufacturer")
 
-    & $Adb shell getprop > (Join-Path $Dir "getprop.txt") 2>&1
+    (& $Adb shell getprop 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "getprop.txt") -Encoding UTF8
 
-    & $Adb shell settings list global > (Join-Path $Dir "settings-global.txt") 2>&1
-    & $Adb shell settings list secure > (Join-Path $Dir "settings-secure.txt") 2>&1
-    & $Adb shell settings list system > (Join-Path $Dir "settings-system.txt") 2>&1
+    (& $Adb shell settings list global 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "settings-global.txt") -Encoding UTF8
+    (& $Adb shell settings list secure 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "settings-secure.txt") -Encoding UTF8
+    (& $Adb shell settings list system 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "settings-system.txt") -Encoding UTF8
 
-    & $Adb shell device_config list > (Join-Path $Dir "device-config-list.txt") 2>&1
-    & $Adb shell dumpsys device_config > (Join-Path $Dir "dumpsys-device-config.txt") 2>&1
+    (& $Adb shell device_config list 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "device-config-list.txt") -Encoding UTF8
+    (& $Adb shell dumpsys device_config 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "dumpsys-device-config.txt") -Encoding UTF8
 
-    & $Adb shell dumpsys package com.google.android.projection.gearhead > (Join-Path $Dir "package-android-auto.txt") 2>&1
-    & $Adb shell dumpsys package com.google.android.gms > (Join-Path $Dir "package-gms.txt") 2>&1
+    (& $Adb shell dumpsys package com.google.android.projection.gearhead 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "package-android-auto.txt") -Encoding UTF8
+    (& $Adb shell dumpsys package com.google.android.gms 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "package-gms.txt") -Encoding UTF8
 
-    & $Adb shell cmd appops get com.google.android.projection.gearhead > (Join-Path $Dir "appops-android-auto.txt") 2>&1
-    & $Adb shell cmd appops get com.google.android.gms > (Join-Path $Dir "appops-gms.txt") 2>&1
+    (& $Adb shell cmd appops get com.google.android.projection.gearhead 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "appops-android-auto.txt") -Encoding UTF8
+    (& $Adb shell cmd appops get com.google.android.gms 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "appops-gms.txt") -Encoding UTF8
 
-    & $Adb shell dumpsys activity services com.google.android.projection.gearhead > (Join-Path $Dir "services-android-auto.txt") 2>&1
-    & $Adb shell dumpsys activity services com.google.android.gms > (Join-Path $Dir "services-gms.txt") 2>&1
+    (& $Adb shell dumpsys activity services com.google.android.projection.gearhead 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "services-android-auto.txt") -Encoding UTF8
+    (& $Adb shell dumpsys activity services com.google.android.gms 2>&1 | Out-String) | Set-Content -Path (Join-Path $Dir "services-gms.txt") -Encoding UTF8
+}
+
+function Get-AndroidAutoWirelessReceiverState {
+    param([string]$PackageDumpPath)
+
+    $Lines = Get-Content $PackageDumpPath -ErrorAction SilentlyContinue
+    $InUser = $false
+    $Section = ""
+    foreach ($Line in $Lines) {
+        if ($Line -match "User 0:") {
+            $InUser = $true
+            $Section = ""
+            continue
+        }
+        if ($InUser -and $Line -match "User \d+:") {
+            break
+        }
+        if (-not $InUser) {
+            continue
+        }
+        $Trimmed = $Line.Trim()
+        if ($Trimmed -eq "disabledComponents:") {
+            $Section = "disabled"
+            continue
+        }
+        if ($Trimmed -eq "enabledComponents:") {
+            $Section = "enabled"
+            continue
+        }
+        if ($Trimmed.Contains($WirelessReceiver)) {
+            if ([string]::IsNullOrWhiteSpace($Section)) {
+                return "listed"
+            }
+            return $Section
+        }
+    }
+    return "not_listed"
 }
 
 function Read-SortedCombined {
@@ -124,6 +163,11 @@ Read-Host "Press Enter to capture AFTER"
 Capture "after" $AfterDir
 
 $DiffText = @()
+$DiffText += ""
+$DiffText += "[android_auto_wireless_receiver]"
+$DiffText += "component=$AndroidAutoPackage/$WirelessReceiver"
+$DiffText += "before=$(Get-AndroidAutoWirelessReceiverState (Join-Path $BeforeDir "package-android-auto.txt"))"
+$DiffText += "after=$(Get-AndroidAutoWirelessReceiverState (Join-Path $AfterDir "package-android-auto.txt"))"
 $DiffText += ""
 $DiffText += "[settings/device_config diff]"
 $DiffText += (Compare-Object (Read-SortedCombined $BeforeDir) (Read-SortedCombined $AfterDir) | Out-String).TrimEnd()

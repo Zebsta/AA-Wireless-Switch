@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${1:-"$ROOT_DIR/captures/adb-$(date +%Y%m%d-%H%M%S)"}"
 REPORT="$OUT_DIR/report.txt"
+ANDROID_AUTO_PACKAGE="com.google.android.projection.gearhead"
+WIRELESS_RECEIVER="com.google.android.apps.auto.wireless.bluetooth.WifiBluetoothReceiver"
 
 mkdir -p "$OUT_DIR"/before "$OUT_DIR"/after
 
@@ -45,6 +47,18 @@ capture() {
   adb shell dumpsys activity services com.google.android.gms > "$dir/services-gms.txt" 2>&1 || true
 }
 
+component_state() {
+  local file="$1"
+  awk -v component="$WIRELESS_RECEIVER" '
+    /User 0:/ { in_user = 1; section = ""; next }
+    in_user && /User [0-9]+:/ { in_user = 0 }
+    in_user && /disabledComponents:/ { section = "disabled"; next }
+    in_user && /enabledComponents:/ { section = "enabled"; next }
+    in_user && index($0, component) { print section; found = 1; exit }
+    END { if (!found) print "not_listed" }
+  ' "$file"
+}
+
 echo "Waiting for an Android device..."
 adb wait-for-device
 
@@ -75,6 +89,12 @@ read -r -p "Press Enter to capture AFTER..."
 capture after
 
 {
+  echo
+  echo "[android_auto_wireless_receiver]"
+  echo "component=$ANDROID_AUTO_PACKAGE/$WIRELESS_RECEIVER"
+  echo "before=$(component_state "$OUT_DIR/before/package-android-auto.txt")"
+  echo "after=$(component_state "$OUT_DIR/after/package-android-auto.txt")"
+
   echo
   echo "[changed files]"
   diff -qr "$OUT_DIR/before" "$OUT_DIR/after" || true
