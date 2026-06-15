@@ -35,9 +35,9 @@ Accessibility automation of the Android Auto settings UI.
 
 ## Safety
 
-The diagnostic app does not request Android permissions and does not write
-system settings. It only reads publicly accessible settings through
-`ContentResolver`, package versions, and device metadata.
+The app uses Android Accessibility only to operate the Android Auto settings UI
+after an explicit user action from the main switch, widget, or Quick Settings
+tile. The diagnostic scripts are read-only and do not write system settings.
 
 ## How to use
 
@@ -53,6 +53,35 @@ Settings tile can be added from the tile editor in the notification shade.
 
 This method depends on Android Auto UI text and layout. It may need adjustment
 for different languages or Android Auto versions.
+
+## Enable Accessibility Service
+
+1. Open `AA Wireless Switch`.
+2. Turn on the main switch.
+3. Android should open Accessibility settings automatically.
+4. Open `Installed apps` or the equivalent Accessibility services list.
+5. Select `AA Wireless Switch automation`.
+6. Enable the service and confirm Android's warning.
+7. Return to `AA Wireless Switch`.
+
+On Samsung devices the path is usually:
+
+```text
+Settings > Accessibility > Installed apps > AA Wireless Switch automation
+```
+
+## Enable Android Auto Developer Mode
+
+1. Open Android Auto settings on the phone.
+2. Scroll to the bottom and tap `Version` several times until developer mode is
+   enabled.
+3. Open the three-dot menu in Android Auto settings.
+4. Select `Developer settings` / `Для разработчиков`.
+5. Verify that the `Wireless Android Auto` / `Беспроводная связь с Android Auto`
+   option exists there.
+
+The app can only automate this menu if Android Auto developer mode is already
+enabled and the `Для разработчиков` menu item is visible.
 
 ## Build
 
