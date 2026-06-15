@@ -64,6 +64,10 @@ On Windows, run the PowerShell version:
 powershell -ExecutionPolicy Bypass -File scripts\adb-readonly-diff.ps1
 ```
 
+The PowerShell script looks for `adb.exe` in PATH, `C:\platform-tools`, the
+standard Android SDK location, and `platform-tools\adb.exe` next to the script
+or repository root.
+
 The script asks for two manual captures around the Android Auto Wireless
 checkbox toggle and writes a report under `captures/`. That directory is ignored
 by git.

@@ -16,12 +16,33 @@ $Report = Join-Path $OutDir "report.txt"
 
 New-Item -ItemType Directory -Force -Path $BeforeDir, $AfterDir | Out-Null
 
-function Assert-Adb {
-    $adb = Get-Command adb -ErrorAction SilentlyContinue
-    if (-not $adb) {
-        throw "adb not found in PATH. Install Android Platform Tools or run from a terminal where adb.exe is available."
+function Find-Adb {
+    $ScriptDir = Split-Path -Parent $MyInvocation.ScriptName
+    $Candidates = @(
+        (Join-Path $ScriptDir "adb.exe"),
+        (Join-Path $ScriptDir "platform-tools\adb.exe"),
+        (Join-Path $RootDir "platform-tools\adb.exe"),
+        "C:\platform-tools\adb.exe",
+        "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe",
+        "$env:ANDROID_HOME\platform-tools\adb.exe",
+        "$env:ANDROID_SDK_ROOT\platform-tools\adb.exe"
+    )
+
+    foreach ($Candidate in $Candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($Candidate) -and (Test-Path $Candidate)) {
+            return $Candidate
+        }
     }
+
+    $Command = Get-Command adb -ErrorAction SilentlyContinue
+    if ($Command) {
+        return $Command.Source
+    }
+
+    throw "adb.exe not found. Put platform-tools next to this script, install Android Platform Tools, or add adb.exe to PATH."
 }
+
+$Adb = Find-Adb
 
 function Run-AdbToFile {
     param(
@@ -29,8 +50,8 @@ function Run-AdbToFile {
         [string[]]$Arguments
     )
 
-    $header = "`$ adb $($Arguments -join ' ')"
-    $body = & adb @Arguments 2>&1 | Out-String
+    $header = "`$ `"$Adb`" $($Arguments -join ' ')"
+    $body = & $Adb @Arguments 2>&1 | Out-String
     Set-Content -Path $Path -Value "$header`r`n$body" -Encoding UTF8
 }
 
@@ -42,23 +63,23 @@ function Capture {
 
     Run-AdbToFile (Join-Path $Dir "device.txt") @("shell", "getprop", "ro.product.manufacturer")
 
-    & adb shell getprop > (Join-Path $Dir "getprop.txt") 2>&1
+    & $Adb shell getprop > (Join-Path $Dir "getprop.txt") 2>&1
 
-    & adb shell settings list global > (Join-Path $Dir "settings-global.txt") 2>&1
-    & adb shell settings list secure > (Join-Path $Dir "settings-secure.txt") 2>&1
-    & adb shell settings list system > (Join-Path $Dir "settings-system.txt") 2>&1
+    & $Adb shell settings list global > (Join-Path $Dir "settings-global.txt") 2>&1
+    & $Adb shell settings list secure > (Join-Path $Dir "settings-secure.txt") 2>&1
+    & $Adb shell settings list system > (Join-Path $Dir "settings-system.txt") 2>&1
 
-    & adb shell device_config list > (Join-Path $Dir "device-config-list.txt") 2>&1
-    & adb shell dumpsys device_config > (Join-Path $Dir "dumpsys-device-config.txt") 2>&1
+    & $Adb shell device_config list > (Join-Path $Dir "device-config-list.txt") 2>&1
+    & $Adb shell dumpsys device_config > (Join-Path $Dir "dumpsys-device-config.txt") 2>&1
 
-    & adb shell dumpsys package com.google.android.projection.gearhead > (Join-Path $Dir "package-android-auto.txt") 2>&1
-    & adb shell dumpsys package com.google.android.gms > (Join-Path $Dir "package-gms.txt") 2>&1
+    & $Adb shell dumpsys package com.google.android.projection.gearhead > (Join-Path $Dir "package-android-auto.txt") 2>&1
+    & $Adb shell dumpsys package com.google.android.gms > (Join-Path $Dir "package-gms.txt") 2>&1
 
-    & adb shell cmd appops get com.google.android.projection.gearhead > (Join-Path $Dir "appops-android-auto.txt") 2>&1
-    & adb shell cmd appops get com.google.android.gms > (Join-Path $Dir "appops-gms.txt") 2>&1
+    & $Adb shell cmd appops get com.google.android.projection.gearhead > (Join-Path $Dir "appops-android-auto.txt") 2>&1
+    & $Adb shell cmd appops get com.google.android.gms > (Join-Path $Dir "appops-gms.txt") 2>&1
 
-    & adb shell dumpsys activity services com.google.android.projection.gearhead > (Join-Path $Dir "services-android-auto.txt") 2>&1
-    & adb shell dumpsys activity services com.google.android.gms > (Join-Path $Dir "services-gms.txt") 2>&1
+    & $Adb shell dumpsys activity services com.google.android.projection.gearhead > (Join-Path $Dir "services-android-auto.txt") 2>&1
+    & $Adb shell dumpsys activity services com.google.android.gms > (Join-Path $Dir "services-gms.txt") 2>&1
 }
 
 function Read-SortedCombined {
@@ -72,10 +93,9 @@ function Read-SortedCombined {
         -ErrorAction SilentlyContinue | Sort-Object
 }
 
-Assert-Adb
-
 Write-Host "Waiting for an Android device..."
-& adb wait-for-device
+Write-Host "Using adb: $Adb"
+& $Adb wait-for-device
 
 $Header = @()
 $Header += "AA Wireless Switch read-only ADB diff"
@@ -83,13 +103,13 @@ $Header += "time=$((Get-Date).ToString('o'))"
 $Header += "output=$OutDir"
 $Header += ""
 $Header += "[adb]"
-$Header += (& adb version 2>&1 | Out-String).TrimEnd()
+$Header += (& $Adb version 2>&1 | Out-String).TrimEnd()
 $Header += ""
 $Header += "[device]"
-$Header += (& adb shell getprop ro.product.manufacturer 2>&1 | Out-String).TrimEnd()
-$Header += (& adb shell getprop ro.product.model 2>&1 | Out-String).TrimEnd()
-$Header += (& adb shell getprop ro.build.version.release 2>&1 | Out-String).TrimEnd()
-$Header += (& adb shell getprop ro.build.version.sdk 2>&1 | Out-String).TrimEnd()
+$Header += (& $Adb shell getprop ro.product.manufacturer 2>&1 | Out-String).TrimEnd()
+$Header += (& $Adb shell getprop ro.product.model 2>&1 | Out-String).TrimEnd()
+$Header += (& $Adb shell getprop ro.build.version.release 2>&1 | Out-String).TrimEnd()
+$Header += (& $Adb shell getprop ro.build.version.sdk 2>&1 | Out-String).TrimEnd()
 $Header += ""
 Set-Content -Path $Report -Value ($Header -join "`r`n") -Encoding UTF8
 
