@@ -11,13 +11,7 @@ import android.widget.Toast;
 import java.util.Locale;
 
 public class AaWirelessAccessibilityService extends AccessibilityService {
-    static final String PREFS = "aa_wireless_accessibility";
-    static final String KEY_PENDING = "pending";
-    static final String KEY_DESIRED_ENABLED = "desired_enabled";
-    static final String KEY_LAST_RESULT = "last_result";
-
     private static final long COMMAND_TTL_MS = 30_000L;
-    private static final String KEY_COMMAND_TIME = "command_time";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int attempts;
@@ -40,17 +34,19 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     }
 
     private boolean hasPendingCommand() {
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        if (!prefs.getBoolean(KEY_PENDING, false)) {
+        SharedPreferences prefs = AutomationController.prefs(this);
+        if (!prefs.getBoolean(AutomationController.KEY_PENDING, false)) {
             attempts = 0;
             return false;
         }
-        long commandTime = prefs.getLong(KEY_COMMAND_TIME, 0L);
+        long commandTime = prefs.getLong(AutomationController.KEY_COMMAND_TIME, 0L);
         if (System.currentTimeMillis() - commandTime > COMMAND_TTL_MS) {
             prefs.edit()
-                    .putBoolean(KEY_PENDING, false)
-                    .putString(KEY_LAST_RESULT, "Command timed out")
+                    .putBoolean(AutomationController.KEY_PENDING, false)
+                    .putString(AutomationController.KEY_LAST_RESULT, "Command timed out")
                     .apply();
+            AaWirelessWidgetProvider.updateAll(this);
+            AaWirelessTileService.requestTileRefresh(this);
             attempts = 0;
             return false;
         }
@@ -74,8 +70,8 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             return;
         }
 
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        boolean desiredEnabled = prefs.getBoolean(KEY_DESIRED_ENABLED, true);
+        SharedPreferences prefs = AutomationController.prefs(this);
+        boolean desiredEnabled = prefs.getBoolean(AutomationController.KEY_DESIRED_ENABLED, true);
         ToggleTarget target = findToggleTarget(root);
         if (target == null || target.clickNode == null) {
             root.recycle();
@@ -84,7 +80,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         }
 
         if (target.checkedKnown && target.checked == desiredEnabled) {
-            finish("Already " + (desiredEnabled ? "enabled" : "disabled"));
+            finish("Already " + (desiredEnabled ? "enabled" : "disabled"), desiredEnabled);
             root.recycle();
             return;
         }
@@ -92,7 +88,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         boolean clicked = target.clickNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
         root.recycle();
         if (clicked) {
-            finish("Clicked Wireless Android Auto switch to " + (desiredEnabled ? "enable" : "disable"));
+            finish("Clicked Wireless Android Auto switch to " + (desiredEnabled ? "enable" : "disable"), desiredEnabled);
         } else {
             retryOrFail("Switch click failed");
         }
@@ -103,23 +99,35 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             scheduleAttempt(500);
             return;
         }
-        finish(reason);
+        fail(reason);
     }
 
-    private void finish(String result) {
-        getSharedPreferences(PREFS, MODE_PRIVATE)
+    private void finish(String result, boolean enabled) {
+        AutomationController.prefs(this)
                 .edit()
-                .putBoolean(KEY_PENDING, false)
-                .putString(KEY_LAST_RESULT, result)
+                .putBoolean(AutomationController.KEY_PENDING, false)
                 .apply();
+        AutomationController.setLastKnownState(this, enabled, result);
+        attempts = 0;
+        Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
+    }
+
+    private void fail(String result) {
+        AutomationController.prefs(this)
+                .edit()
+                .putBoolean(AutomationController.KEY_PENDING, false)
+                .putString(AutomationController.KEY_LAST_RESULT, result)
+                .apply();
+        AaWirelessWidgetProvider.updateAll(this);
+        AaWirelessTileService.requestTileRefresh(this);
         attempts = 0;
         Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
     }
 
     private void saveResult(String result) {
-        getSharedPreferences(PREFS, MODE_PRIVATE)
+        AutomationController.prefs(this)
                 .edit()
-                .putString(KEY_LAST_RESULT, result)
+                .putString(AutomationController.KEY_LAST_RESULT, result)
                 .apply();
     }
 

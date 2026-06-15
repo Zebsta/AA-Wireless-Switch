@@ -1,0 +1,11 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_title"
+    android:initialLayout="@layout/widget_aa_wireless"
+    android:minWidth="160dp"
+    android:minHeight="72dp"
+    android:previewLayout="@layout/widget_aa_wireless"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

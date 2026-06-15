@@ -2,9 +2,10 @@
 
 Personal Android app for investigating and later toggling Android Auto wireless mode.
 
-Current state: experimental AccessibilityService APK plus read-only diagnostics.
-The accessibility path opens Android Auto settings and tries to click the
-Wireless Android Auto switch in the same UI a user would operate manually.
+Current state: experimental AccessibilityService-based switch. The app exposes
+a single main toggle, a home-screen widget, and a Quick Settings tile. The
+accessibility path opens Android Auto settings and clicks the Wireless Android
+Auto switch in the same UI a user would operate manually.
 
 ## Current findings
 
@@ -42,12 +43,13 @@ system settings. It only reads publicly accessible settings through
 
 1. Install the APK on the phone.
 2. Open the app.
-3. Tap `Включить службу Accessibility`.
-4. Enable `AA Wireless Switch automation` in Android Accessibility settings.
-5. Return to the app.
-6. Tap `Включить Android Auto Wireless` or `Выключить Android Auto Wireless`.
-7. The app opens Android Auto settings; the accessibility service tries to find
-   and click the Wireless Android Auto switch.
+3. Turn on the main switch.
+4. If Accessibility is not enabled yet, Android opens Accessibility settings.
+5. Enable `AA Wireless Switch automation`.
+6. Return to the app and use the switch again.
+
+The home-screen widget can be added from the launcher widget picker. The Quick
+Settings tile can be added from the tile editor in the notification shade.
 
 This method depends on Android Auto UI text and layout. It may need adjustment
 for different languages or Android Auto versions.

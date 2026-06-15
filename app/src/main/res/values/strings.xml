@@ -1,5 +1,24 @@
 <resources>
-    <string name="app_name">AA Wireless Diagnostic</string>
+    <string name="app_name">AA Wireless Switch</string>
     <string name="accessibility_service_label">AA Wireless Switch automation</string>
     <string name="accessibility_service_description">Automates the Android Auto settings screen to toggle Wireless Android Auto.</string>
+    <string name="main_switch_label">Wireless Android Auto</string>
+    <string name="status_accessibility_required">Enable Accessibility service to use the switch.</string>
+    <string name="status_pending">Opening Android Auto settings...</string>
+    <string name="status_unknown">State unknown. Toggle once to sync.</string>
+    <string name="status_enabled">Wireless Android Auto is enabled.</string>
+    <string name="status_disabled">Wireless Android Auto is disabled.</string>
+    <string name="widget_title">Android Auto</string>
+    <string name="widget_on">Wireless on</string>
+    <string name="widget_off">Wireless off</string>
+    <string name="widget_unknown">State unknown</string>
+    <string name="widget_pending">Switching...</string>
+    <string name="widget_turn_on">Turn on</string>
+    <string name="widget_turn_off">Turn off</string>
+    <string name="tile_label">Android Auto</string>
+    <string name="tile_on">Wireless on</string>
+    <string name="tile_off">Wireless off</string>
+    <string name="tile_unknown">Unknown</string>
+    <string name="tile_pending">Switching</string>
+    <string name="tile_setup">Setup required</string>
 </resources>

@@ -1,427 +1,94 @@
 package dev.local.aawirelessdiag;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.database.Cursor;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
-import android.view.View;
-import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
-
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "0.3.0";
-    private static final String PREFS = "snapshots";
-    private static final String KEY_BEFORE = "before";
-    private static final String KEY_AFTER = "after";
-    private static final String ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead";
-    private static final String ANDROID_AUTO_SETTINGS_ACTION = "com.google.android.projection.gearhead.SETTINGS";
-
-    private TextView output;
-    private SharedPreferences prefs;
+    private Switch mainSwitch;
+    private TextView status;
+    private boolean binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         setContentView(buildView());
-        showInstructions();
     }
 
-    private View buildView() {
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refresh();
+    }
+
+    private LinearLayout buildView() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(18), dp(16), dp(12));
-        root.setBackgroundColor(0xFFF7F8FA);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(dp(24), dp(24), dp(24), dp(24));
 
         TextView title = new TextView(this);
-        title.setText("AA Wireless Diagnostic");
-        title.setTextSize(22);
-        title.setTextColor(0xFF17211E);
-        title.setGravity(Gravity.START);
+        title.setText(getString(R.string.app_name));
+        title.setTextAppearance(android.R.style.TextAppearance_Material_Headline);
+        title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Read-only диагностика. Системные настройки не изменяются.");
-        subtitle.setTextSize(14);
-        subtitle.setTextColor(0xFF52615D);
-        subtitle.setPadding(0, dp(4), 0, dp(12));
-        root.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
+        mainSwitch = new Switch(this);
+        mainSwitch.setText(R.string.main_switch_label);
+        mainSwitch.setTextAppearance(android.R.style.TextAppearance_Material_Title);
+        mainSwitch.setGravity(Gravity.CENTER);
+        mainSwitch.setPadding(0, dp(28), 0, dp(18));
+        mainSwitch.setOnCheckedChangeListener(this::onSwitchChanged);
+        root.addView(mainSwitch, new LinearLayout.LayoutParams(-2, -2));
 
-        LinearLayout buttons = new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.VERTICAL);
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, -2));
-
-        addButton(buttons, "Включить службу Accessibility", v -> openAccessibilitySettings());
-        addButton(buttons, "Включить Android Auto Wireless", v -> requestAccessibilityToggle(true));
-        addButton(buttons, "Выключить Android Auto Wireless", v -> requestAccessibilityToggle(false));
-        addButton(buttons, "1. Снять ДО", v -> saveSnapshot(KEY_BEFORE));
-        addButton(buttons, "2. Снять ПОСЛЕ", v -> saveSnapshot(KEY_AFTER));
-        addButton(buttons, "3. Показать diff для отправки", v -> showDiff());
-        addButton(buttons, "Текущий полный снимок", v -> showCurrentSnapshot());
-        addButton(buttons, "Копировать отчет", v -> copyReport());
-        addButton(buttons, "Отправить отчет", v -> shareReport());
-
-        ScrollView scroll = new ScrollView(this);
-        output = new TextView(this);
-        output.setTextSize(12);
-        output.setTextColor(0xFF1B1F1D);
-        output.setTextIsSelectable(true);
-        output.setPadding(0, dp(12), 0, 0);
-        scroll.addView(output);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        status = new TextView(this);
+        status.setTextAppearance(android.R.style.TextAppearance_Material_Body1);
+        status.setGravity(Gravity.CENTER);
+        root.addView(status, new LinearLayout.LayoutParams(-1, -2));
 
         return root;
     }
 
-    private void addButton(LinearLayout parent, String text, View.OnClickListener listener) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setOnClickListener(listener);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(46));
-        lp.setMargins(0, 0, 0, dp(8));
-        parent.addView(button, lp);
-    }
-
-    private void showInstructions() {
-        output.setText(
-                "Как пользоваться:\n\n"
-                        + "Accessibility test:\n"
-                        + "1. Нажми \"Включить службу Accessibility\" и включи службу \"AA Wireless Switch automation\".\n"
-                        + "2. Вернись в приложение.\n"
-                        + "3. Нажми \"Включить\" или \"Выключить Android Auto Wireless\".\n"
-                        + "4. Приложение откроет настройки Android Auto, а служба попробует нажать нужный переключатель.\n\n"
-                        + "Диагностика осталась ниже для проверки diff.\n"
-        );
-    }
-
-    private void openAccessibilitySettings() {
-        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-    }
-
-    private void requestAccessibilityToggle(boolean desiredEnabled) {
-        if (!isAccessibilityServiceEnabled()) {
-            output.setText(
-                    "Сначала включи службу специальных возможностей:\n\n"
-                            + "AA Wireless Switch automation\n\n"
-                            + "После включения вернись сюда и повтори команду."
-            );
-            openAccessibilitySettings();
+    private void onSwitchChanged(CompoundButton button, boolean checked) {
+        if (binding) {
             return;
         }
-
-        getSharedPreferences(AaWirelessAccessibilityService.PREFS, MODE_PRIVATE)
-                .edit()
-                .putBoolean(AaWirelessAccessibilityService.KEY_PENDING, true)
-                .putBoolean(AaWirelessAccessibilityService.KEY_DESIRED_ENABLED, desiredEnabled)
-                .putLong("command_time", System.currentTimeMillis())
-                .putString(AaWirelessAccessibilityService.KEY_LAST_RESULT, "Command started")
-                .apply();
-
-        output.setText(
-                "Команда отправлена: "
-                        + (desiredEnabled ? "включить" : "выключить")
-                        + " Android Auto Wireless.\n\nОткрываю настройки Android Auto..."
-        );
-        openAndroidAutoSettings();
-    }
-
-    private boolean isAccessibilityServiceEnabled() {
-        ComponentName expected = new ComponentName(this, AaWirelessAccessibilityService.class);
-        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        if (enabled == null) {
-            return false;
-        }
-        String expectedShort = expected.flattenToShortString();
-        String expectedLong = expected.flattenToString();
-        String[] services = enabled.split(":");
-        for (String service : services) {
-            if (expectedShort.equalsIgnoreCase(service) || expectedLong.equalsIgnoreCase(service)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void openAndroidAutoSettings() {
-        Intent intent = new Intent(ANDROID_AUTO_SETTINGS_ACTION);
-        intent.setPackage(ANDROID_AUTO_PACKAGE);
-        intent.addCategory(Intent.CATEGORY_DEFAULT);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            startActivity(intent);
+        if (!AutomationController.isAccessibilityServiceEnabled(this)) {
+            AutomationController.openAccessibilitySettings(this);
+            refresh();
             return;
-        } catch (ActivityNotFoundException ignored) {
-            // Fall through to the standard app preferences action.
         }
-
-        Intent preferences = new Intent(Intent.ACTION_APPLICATION_PREFERENCES);
-        preferences.setPackage(ANDROID_AUTO_PACKAGE);
-        preferences.addCategory(Intent.CATEGORY_DEFAULT);
-        preferences.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            startActivity(preferences);
-            return;
-        } catch (ActivityNotFoundException ignored) {
-            // Fall through to app details as a last visible fallback.
-        }
-
-        Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        details.setData(Uri.parse("package:" + ANDROID_AUTO_PACKAGE));
-        startActivity(details);
+        AutomationController.requestToggle(this, checked);
+        refresh();
     }
 
-    private void saveSnapshot(String key) {
-        String snapshot = collectSnapshot();
-        prefs.edit().putString(key, snapshot).apply();
-        if (KEY_AFTER.equals(key) && !prefs.getString(KEY_BEFORE, "").isEmpty()) {
-            output.setText(buildDiffReport(prefs.getString(KEY_BEFORE, ""), snapshot));
+    private void refresh() {
+        SharedPreferences prefs = AutomationController.prefs(this);
+        boolean known = prefs.getBoolean(AutomationController.KEY_LAST_KNOWN_VALID, false);
+        boolean enabled = prefs.getBoolean(AutomationController.KEY_LAST_KNOWN_ENABLED, false);
+        boolean pending = prefs.getBoolean(AutomationController.KEY_PENDING, false);
+        boolean serviceEnabled = AutomationController.isAccessibilityServiceEnabled(this);
+
+        binding = true;
+        mainSwitch.setChecked(enabled);
+        mainSwitch.setEnabled(true);
+        binding = false;
+
+        if (!serviceEnabled) {
+            status.setText(R.string.status_accessibility_required);
+        } else if (pending) {
+            status.setText(R.string.status_pending);
+        } else if (!known) {
+            status.setText(R.string.status_unknown);
         } else {
-            output.setText(
-                    "Снимок ДО сохранен.\n\n"
-                            + "Теперь вручную переключи чекбокс \"Беспроводная связь с Android Auto\", "
-                            + "вернись сюда и нажми \"2. Снять ПОСЛЕ\".\n\n"
-                            + "Полный снимок скрыт, чтобы случайно не отправить не тот отчет."
-            );
+            status.setText(enabled ? R.string.status_enabled : R.string.status_disabled);
         }
-        Toast.makeText(this, key.equals(KEY_BEFORE) ? "Снимок ДО сохранен" : "Снимок ПОСЛЕ сохранен", Toast.LENGTH_SHORT).show();
-    }
-
-    private void showCurrentSnapshot() {
-        output.setText(collectSnapshot());
-    }
-
-    private void showDiff() {
-        String before = prefs.getString(KEY_BEFORE, "");
-        String after = prefs.getString(KEY_AFTER, "");
-        if (before.isEmpty() || after.isEmpty()) {
-            output.setText("Нужно сначала сделать оба снимка: ДО и ПОСЛЕ.");
-            return;
-        }
-        output.setText(buildDiffReport(before, after));
-    }
-
-    private void copyReport() {
-        String text = output.getText().toString();
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText("AA Wireless Diagnostic", text));
-        Toast.makeText(this, "Отчет скопирован", Toast.LENGTH_SHORT).show();
-    }
-
-    private void shareReport() {
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_SUBJECT, "AA Wireless Diagnostic report");
-        intent.putExtra(Intent.EXTRA_TEXT, output.getText().toString());
-        startActivity(Intent.createChooser(intent, "Отправить отчет"));
-    }
-
-    private String collectSnapshot() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("AA Wireless Diagnostic snapshot\n");
-        sb.append("time=").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(new Date())).append('\n');
-        sb.append("appVersion=").append(APP_VERSION).append("\n\n");
-
-        appendDeviceInfo(sb);
-        appendPackageInfo(sb, "com.google.android.projection.gearhead", "Android Auto");
-        appendPackageInfo(sb, "com.google.android.gms", "Google Play Services");
-
-        Map<String, String> all = new TreeMap<>();
-        readSettingsTable("secure", Settings.Secure.CONTENT_URI, all);
-        readSettingsTable("global", Settings.Global.CONTENT_URI, all);
-        readSettingsTable("system", Settings.System.CONTENT_URI, all);
-
-        sb.append("\n[interesting_keys]\n");
-        int interestingCount = 0;
-        for (Map.Entry<String, String> entry : all.entrySet()) {
-            String lower = entry.getKey().toLowerCase(Locale.US);
-            if (lower.contains("auto")
-                    || lower.contains("car")
-                    || lower.contains("wireless")
-                    || lower.contains("wifi")
-                    || lower.contains("projection")
-                    || lower.contains("gearhead")
-                    || lower.contains("android_auto")) {
-                sb.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
-                interestingCount++;
-            }
-        }
-        if (interestingCount == 0) {
-            sb.append("(none)\n");
-        }
-
-        sb.append("\n[all_settings]\n");
-        for (Map.Entry<String, String> entry : all.entrySet()) {
-            sb.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
-        }
-
-        return sb.toString();
-    }
-
-    private void appendDeviceInfo(StringBuilder sb) {
-        sb.append("[device]\n");
-        sb.append("sdk=").append(Build.VERSION.SDK_INT).append('\n');
-        sb.append("release=").append(Build.VERSION.RELEASE).append('\n');
-        sb.append("manufacturer=").append(Build.MANUFACTURER).append('\n');
-        sb.append("brand=").append(Build.BRAND).append('\n');
-        sb.append("model=").append(Build.MODEL).append('\n');
-        sb.append("fingerprint=").append(Build.FINGERPRINT).append('\n');
-    }
-
-    private void appendPackageInfo(StringBuilder sb, String packageName, String label) {
-        sb.append("\n[package:").append(packageName).append("]\n");
-        try {
-            PackageInfo info = getPackageManager().getPackageInfo(packageName, 0);
-            sb.append("label=").append(label).append('\n');
-            sb.append("versionName=").append(info.versionName).append('\n');
-            if (Build.VERSION.SDK_INT >= 28) {
-                sb.append("versionCode=").append(info.getLongVersionCode()).append('\n');
-            } else {
-                sb.append("versionCode=").append(info.versionCode).append('\n');
-            }
-        } catch (PackageManager.NameNotFoundException e) {
-            sb.append("not_found=true\n");
-        } catch (RuntimeException e) {
-            sb.append("error=").append(e.getClass().getSimpleName()).append(": ").append(e.getMessage()).append('\n');
-        }
-    }
-
-    private void readSettingsTable(String tableName, Uri uri, Map<String, String> out) {
-        Cursor cursor = null;
-        try {
-            cursor = getContentResolver().query(uri, new String[]{"name", "value"}, null, null, null);
-            if (cursor == null) {
-                out.put(tableName + ".__query_result", "null");
-                return;
-            }
-            int nameIndex = cursor.getColumnIndex("name");
-            int valueIndex = cursor.getColumnIndex("value");
-            while (cursor.moveToNext()) {
-                String name = nameIndex >= 0 ? cursor.getString(nameIndex) : null;
-                String value = valueIndex >= 0 ? cursor.getString(valueIndex) : null;
-                if (name != null) {
-                    out.put(tableName + "." + name, value == null ? "" : value);
-                }
-            }
-            out.put(tableName + ".__row_count", String.valueOf(cursor.getCount()));
-        } catch (SecurityException e) {
-            out.put(tableName + ".__security_error", e.getMessage());
-        } catch (RuntimeException e) {
-            out.put(tableName + ".__error", e.getClass().getSimpleName() + ": " + e.getMessage());
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-    }
-
-    private String buildDiffReport(String before, String after) {
-        Map<String, String> beforeMap = parseSettings(before);
-        Map<String, String> afterMap = parseSettings(after);
-        List<String> keys = new ArrayList<>();
-        keys.addAll(beforeMap.keySet());
-        for (String key : afterMap.keySet()) {
-            if (!beforeMap.containsKey(key)) {
-                keys.add(key);
-            }
-        }
-        Collections.sort(keys);
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("AA Wireless Diagnostic diff\n\n");
-        appendSnapshotSummary(sb, "before", before);
-        appendSnapshotSummary(sb, "after", after);
-        sb.append('\n');
-
-        sb.append("[changed]\n");
-        int changed = 0;
-        for (String key : keys) {
-            String oldValue = beforeMap.get(key);
-            String newValue = afterMap.get(key);
-            if (oldValue == null || newValue == null || !oldValue.equals(newValue)) {
-                sb.append(key).append('\n');
-                sb.append("  before=").append(oldValue == null ? "(missing)" : oldValue).append('\n');
-                sb.append("  after =").append(newValue == null ? "(missing)" : newValue).append("\n\n");
-                changed++;
-            }
-        }
-        if (changed == 0) {
-            sb.append("(none)\n");
-        }
-
-        sb.append("\nЕсли [changed] пустой, переключатель Android Auto Wireless не виден через обычные ");
-        sb.append("Settings.Secure/Global/System и нужен следующий способ диагностики: ADB shell diff, ");
-        sb.append("Shizuku или root.\n");
-        return sb.toString();
-    }
-
-    private void appendSnapshotSummary(StringBuilder sb, String name, String snapshot) {
-        sb.append('[').append(name).append("_summary]\n");
-        String[] lines = snapshot.split("\\r?\\n");
-        for (String line : lines) {
-            if (line.startsWith("time=")
-                    || line.startsWith("appVersion=")
-                    || line.startsWith("sdk=")
-                    || line.startsWith("release=")
-                    || line.startsWith("manufacturer=")
-                    || line.startsWith("brand=")
-                    || line.startsWith("model=")
-                    || line.startsWith("versionName=")
-                    || line.startsWith("versionCode=")
-                    || line.startsWith("global.__row_count=")
-                    || line.startsWith("secure.__row_count=")
-                    || line.startsWith("system.__row_count=")) {
-                sb.append(line).append('\n');
-            }
-        }
-    }
-
-    private Map<String, String> parseSettings(String snapshot) {
-        Map<String, String> result = new LinkedHashMap<>();
-        boolean inAllSettings = false;
-        String[] lines = snapshot.split("\\r?\\n");
-        for (String line : lines) {
-            if ("[all_settings]".equals(line)) {
-                inAllSettings = true;
-                continue;
-            }
-            if (inAllSettings && line.startsWith("[") && line.endsWith("]")) {
-                break;
-            }
-            if (!inAllSettings) {
-                continue;
-            }
-            int eq = line.indexOf('=');
-            if (eq > 0) {
-                result.put(line.substring(0, eq), line.substring(eq + 1));
-            }
-        }
-        return result;
     }
 
     private int dp(int value) {
