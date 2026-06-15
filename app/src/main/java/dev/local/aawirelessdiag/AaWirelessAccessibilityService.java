@@ -102,7 +102,9 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 scheduleAttempt(700);
                 return;
             }
-            developerMenuOpened = true;
+            root.recycle();
+            retryOrFail("Android Auto developer settings was not found");
+            return;
         }
 
         ToggleTarget target = findToggleTarget(root);
