@@ -24,6 +24,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int attempts;
     private long activeCommandTime;
+    private boolean overflowMenuOpened;
     private boolean developerMenuOpened;
 
     @Override
@@ -53,6 +54,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         if (commandTime != activeCommandTime) {
             activeCommandTime = commandTime;
             attempts = 0;
+            overflowMenuOpened = false;
             developerMenuOpened = false;
         }
         if (System.currentTimeMillis() - commandTime > COMMAND_TTL_MS) {
@@ -63,6 +65,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             AaWirelessWidgetProvider.updateAll(this);
             AaWirelessTileService.requestTileRefresh(this);
             attempts = 0;
+            overflowMenuOpened = false;
             developerMenuOpened = false;
             return false;
         }
@@ -88,6 +91,18 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
         SharedPreferences prefs = AutomationController.prefs(this);
         boolean desiredEnabled = prefs.getBoolean(AutomationController.KEY_DESIRED_ENABLED, true);
+        if (!overflowMenuOpened) {
+            if (openOverflowMenu(root)) {
+                overflowMenuOpened = true;
+                root.recycle();
+                scheduleAttempt(500);
+                return;
+            }
+            root.recycle();
+            retryOrFail("Android Auto overflow menu was not found");
+            return;
+        }
+
         if (!developerMenuOpened) {
             int developerAction = openDeveloperMenu(root);
             if (developerAction == OPEN_DEVELOPER_CLICKED) {
@@ -145,6 +160,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 .apply();
         AutomationController.setLastKnownState(this, enabled, result);
         attempts = 0;
+        overflowMenuOpened = false;
         developerMenuOpened = false;
         Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
     }
@@ -158,6 +174,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         AaWirelessWidgetProvider.updateAll(this);
         AaWirelessTileService.requestTileRefresh(this);
         attempts = 0;
+        overflowMenuOpened = false;
         developerMenuOpened = false;
         Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
     }
@@ -174,6 +191,25 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
                 CLOSE_SETTINGS_DELAY_MS
         );
+    }
+
+    private boolean openOverflowMenu(AccessibilityNodeInfo root) {
+        AccessibilityNodeInfo button = findOverflowMenuNode(root);
+        if (button != null) {
+            AccessibilityNodeInfo clickable = findClickableAncestor(button);
+            boolean clicked;
+            if (clickable != null) {
+                clicked = performClick(clickable);
+                clickable.recycle();
+            } else {
+                clicked = tapNodeCenter(button);
+            }
+            button.recycle();
+            if (clicked) {
+                return true;
+            }
+        }
+        return tapTopRight(root);
     }
 
     private int openDeveloperMenu(AccessibilityNodeInfo root) {
@@ -254,6 +290,28 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         return null;
     }
 
+    private AccessibilityNodeInfo findOverflowMenuNode(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return null;
+        }
+        CharSequence text = node.getText();
+        CharSequence description = node.getContentDescription();
+        if (matchesOverflowMenu(text) || matchesOverflowMenu(description)) {
+            return AccessibilityNodeInfo.obtain(node);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo found = findOverflowMenuNode(child);
+            if (child != null) {
+                child.recycle();
+            }
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
     private AccessibilityNodeInfo findDeveloperMenuLabel(AccessibilityNodeInfo node) {
         if (node == null) {
             return null;
@@ -287,6 +345,19 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 || text.contains("wi-fi")
                 || text.contains("wifi");
         return mentionsAndroidAuto && mentionsWireless;
+    }
+
+    private boolean matchesOverflowMenu(CharSequence value) {
+        if (value == null) {
+            return false;
+        }
+        String text = value.toString().toLowerCase(Locale.ROOT);
+        return text.contains("ещё")
+                || text.contains("еще")
+                || text.contains("more options")
+                || text.equals("more")
+                || text.contains("overflow")
+                || text.contains("menu");
     }
 
     private boolean matchesDeveloperMenu(CharSequence value) {
@@ -340,6 +411,25 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         }
         Path path = new Path();
         path.moveTo(bounds.centerX(), bounds.centerY());
+        GestureDescription gesture = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
+                .build();
+        return dispatchGesture(gesture, null, null);
+    }
+
+    private boolean tapTopRight(AccessibilityNodeInfo root) {
+        if (root == null || Build.VERSION.SDK_INT < 24) {
+            return false;
+        }
+        Rect bounds = new Rect();
+        root.getBoundsInScreen(bounds);
+        if (bounds.isEmpty()) {
+            return false;
+        }
+        float x = bounds.right - 48f * getResources().getDisplayMetrics().density;
+        float y = bounds.top + 48f * getResources().getDisplayMetrics().density;
+        Path path = new Path();
+        path.moveTo(x, y);
         GestureDescription gesture = new GestureDescription.Builder()
                 .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
                 .build();
