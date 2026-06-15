@@ -19,7 +19,6 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
     private static final int OPEN_DEVELOPER_NOT_FOUND = 0;
     private static final int OPEN_DEVELOPER_CLICKED = 1;
-    private static final int OPEN_DEVELOPER_SCROLLED = 2;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int attempts;
@@ -91,33 +90,31 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
         SharedPreferences prefs = AutomationController.prefs(this);
         boolean desiredEnabled = prefs.getBoolean(AutomationController.KEY_DESIRED_ENABLED, true);
-        if (!overflowMenuOpened) {
-            if (openOverflowMenu(root)) {
-                overflowMenuOpened = true;
-                root.recycle();
-                scheduleAttempt(500);
-                return;
-            }
-            root.recycle();
-            retryOrFail("Android Auto overflow menu was not found");
-            return;
-        }
-
         if (!developerMenuOpened) {
             int developerAction = openDeveloperMenu(root);
             if (developerAction == OPEN_DEVELOPER_CLICKED) {
                 developerMenuOpened = true;
+                overflowMenuOpened = false;
                 root.recycle();
                 scheduleAttempt(800);
                 return;
             }
-            if (developerAction == OPEN_DEVELOPER_SCROLLED) {
+
+            if (!overflowMenuOpened) {
+                if (openOverflowMenu(root)) {
+                    overflowMenuOpened = true;
+                    root.recycle();
+                    scheduleAttempt(700);
+                    return;
+                }
                 root.recycle();
-                scheduleAttempt(700);
+                retryOrFail("Android Auto overflow menu was not found");
                 return;
             }
+
+            overflowMenuOpened = false;
             root.recycle();
-            retryOrFail("Android Auto developer settings was not found");
+            retryOrFail("Android Auto overflow menu did not open");
             return;
         }
 
@@ -209,13 +206,21 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 return true;
             }
         }
+        AccessibilityNodeInfo topRightButton = findTopRightClickableNode(root);
+        if (topRightButton != null) {
+            boolean clicked = performClick(topRightButton);
+            topRightButton.recycle();
+            if (clicked) {
+                return true;
+            }
+        }
         return tapTopRight(root);
     }
 
     private int openDeveloperMenu(AccessibilityNodeInfo root) {
         AccessibilityNodeInfo label = findDeveloperMenuLabel(root);
         if (label == null) {
-            return scrollForward(root) ? OPEN_DEVELOPER_SCROLLED : OPEN_DEVELOPER_NOT_FOUND;
+            return OPEN_DEVELOPER_NOT_FOUND;
         }
         AccessibilityNodeInfo clickable = findClickableAncestor(label);
         boolean clicked;
@@ -310,6 +315,39 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             }
         }
         return null;
+    }
+
+    private AccessibilityNodeInfo findTopRightClickableNode(AccessibilityNodeInfo root) {
+        Rect rootBounds = new Rect();
+        root.getBoundsInScreen(rootBounds);
+        if (rootBounds.isEmpty()) {
+            return null;
+        }
+        TopRightCandidate candidate = new TopRightCandidate(rootBounds);
+        collectTopRightClickableNode(root, candidate);
+        return candidate.node;
+    }
+
+    private void collectTopRightClickableNode(AccessibilityNodeInfo node, TopRightCandidate candidate) {
+        if (node == null) {
+            return;
+        }
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        if (node.isClickable() && node.isEnabled() && candidate.isBetter(bounds)) {
+            if (candidate.node != null) {
+                candidate.node.recycle();
+            }
+            candidate.node = AccessibilityNodeInfo.obtain(node);
+            candidate.bounds.set(bounds);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            collectTopRightClickableNode(child, candidate);
+            if (child != null) {
+                child.recycle();
+            }
+        }
     }
 
     private AccessibilityNodeInfo findDeveloperMenuLabel(AccessibilityNodeInfo node) {
@@ -426,34 +464,14 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         if (bounds.isEmpty()) {
             return false;
         }
-        float x = bounds.right - 48f * getResources().getDisplayMetrics().density;
-        float y = bounds.top + 48f * getResources().getDisplayMetrics().density;
+        float x = bounds.right - 28f * getResources().getDisplayMetrics().density;
+        float y = bounds.top + 28f * getResources().getDisplayMetrics().density;
         Path path = new Path();
         path.moveTo(x, y);
         GestureDescription gesture = new GestureDescription.Builder()
                 .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
                 .build();
         return dispatchGesture(gesture, null, null);
-    }
-
-    private boolean scrollForward(AccessibilityNodeInfo node) {
-        if (node == null) {
-            return false;
-        }
-        if (node.isScrollable() && node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
-            return true;
-        }
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            boolean scrolled = scrollForward(child);
-            if (child != null) {
-                child.recycle();
-            }
-            if (scrolled) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean isSwitchClass(AccessibilityNodeInfo node) {
@@ -482,5 +500,40 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo clickNode;
         boolean checkedKnown;
         boolean checked;
+    }
+
+    private static final class TopRightCandidate {
+        final Rect rootBounds;
+        final Rect bounds = new Rect();
+        AccessibilityNodeInfo node;
+
+        TopRightCandidate(Rect rootBounds) {
+            this.rootBounds = rootBounds;
+        }
+
+        boolean isBetter(Rect candidateBounds) {
+            if (candidateBounds.isEmpty()) {
+                return false;
+            }
+            int rootWidth = rootBounds.width();
+            int rootHeight = rootBounds.height();
+            boolean inTopRight = candidateBounds.centerX() > rootBounds.left + rootWidth * 2 / 3
+                    && candidateBounds.centerY() < rootBounds.top + rootHeight / 4;
+            if (!inTopRight) {
+                return false;
+            }
+            int width = candidateBounds.width();
+            int height = candidateBounds.height();
+            if (width <= 0 || height <= 0 || width > rootWidth / 3 || height > rootHeight / 5) {
+                return false;
+            }
+            if (node == null) {
+                return true;
+            }
+            if (candidateBounds.right != bounds.right) {
+                return candidateBounds.right > bounds.right;
+            }
+            return candidateBounds.top < bounds.top;
+        }
     }
 }
