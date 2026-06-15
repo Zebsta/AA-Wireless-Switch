@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">AA Wireless Diagnostic</string>
+    <string name="accessibility_service_label">AA Wireless Switch automation</string>
+    <string name="accessibility_service_description">Automates the Android Auto settings screen to toggle Wireless Android Auto.</string>
 </resources>

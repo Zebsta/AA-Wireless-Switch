@@ -2,9 +2,9 @@
 
 Personal Android app for investigating and later toggling Android Auto wireless mode.
 
-Current state: read-only diagnostic APK. It helps find where the Android Auto
-wireless checkbox stores its state by comparing settings snapshots before and
-after a manual toggle.
+Current state: experimental AccessibilityService APK plus read-only diagnostics.
+The accessibility path opens Android Auto settings and tries to click the
+Wireless Android Auto switch in the same UI a user would operate manually.
 
 ## Current findings
 
@@ -42,12 +42,15 @@ system settings. It only reads publicly accessible settings through
 
 1. Install the APK on the phone.
 2. Open the app.
-3. Set the Android Auto wireless checkbox to the first state manually.
-4. Tap `1. Снять ДО`.
-5. Manually switch `Беспроводная связь с Android Auto`.
-6. Return to the app and tap `2. Снять ПОСЛЕ`.
-7. Tap `3. Показать diff для отправки`.
-8. Send back the report text.
+3. Tap `Включить службу Accessibility`.
+4. Enable `AA Wireless Switch automation` in Android Accessibility settings.
+5. Return to the app.
+6. Tap `Включить Android Auto Wireless` or `Выключить Android Auto Wireless`.
+7. The app opens Android Auto settings; the accessibility service tries to find
+   and click the Wireless Android Auto switch.
+
+This method depends on Android Auto UI text and layout. It may need adjustment
+for different languages or Android Auto versions.
 
 ## Build
 

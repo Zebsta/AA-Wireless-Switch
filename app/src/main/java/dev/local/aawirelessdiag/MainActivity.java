@@ -1,8 +1,10 @@
 package dev.local.aawirelessdiag;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -32,10 +34,12 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class MainActivity extends Activity {
-    private static final String APP_VERSION = "0.2.0";
+    private static final String APP_VERSION = "0.3.0";
     private static final String PREFS = "snapshots";
     private static final String KEY_BEFORE = "before";
     private static final String KEY_AFTER = "after";
+    private static final String ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead";
+    private static final String ANDROID_AUTO_SETTINGS_ACTION = "com.google.android.projection.gearhead.SETTINGS";
 
     private TextView output;
     private SharedPreferences prefs;
@@ -72,6 +76,9 @@ public class MainActivity extends Activity {
         buttons.setOrientation(LinearLayout.VERTICAL);
         root.addView(buttons, new LinearLayout.LayoutParams(-1, -2));
 
+        addButton(buttons, "Включить службу Accessibility", v -> openAccessibilitySettings());
+        addButton(buttons, "Включить Android Auto Wireless", v -> requestAccessibilityToggle(true));
+        addButton(buttons, "Выключить Android Auto Wireless", v -> requestAccessibilityToggle(false));
         addButton(buttons, "1. Снять ДО", v -> saveSnapshot(KEY_BEFORE));
         addButton(buttons, "2. Снять ПОСЛЕ", v -> saveSnapshot(KEY_AFTER));
         addButton(buttons, "3. Показать diff для отправки", v -> showDiff());
@@ -104,14 +111,89 @@ public class MainActivity extends Activity {
     private void showInstructions() {
         output.setText(
                 "Как пользоваться:\n\n"
-                        + "1. Установи APK и открой приложение.\n"
-                        + "2. Выставь Android Auto Wireless в первом состоянии.\n"
-                        + "3. Нажми \"1. Снять ДО\".\n"
-                        + "4. Вручную переключи чекбокс \"Беспроводная связь с Android Auto\".\n"
-                        + "5. Вернись сюда и нажми \"2. Снять ПОСЛЕ\".\n"
-                        + "6. Нажми \"3. Показать diff для отправки\" и отправь отчет.\n\n"
-                        + "Приложение не запрашивает опасные разрешения и не записывает системные настройки.\n"
+                        + "Accessibility test:\n"
+                        + "1. Нажми \"Включить службу Accessibility\" и включи службу \"AA Wireless Switch automation\".\n"
+                        + "2. Вернись в приложение.\n"
+                        + "3. Нажми \"Включить\" или \"Выключить Android Auto Wireless\".\n"
+                        + "4. Приложение откроет настройки Android Auto, а служба попробует нажать нужный переключатель.\n\n"
+                        + "Диагностика осталась ниже для проверки diff.\n"
         );
+    }
+
+    private void openAccessibilitySettings() {
+        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+    }
+
+    private void requestAccessibilityToggle(boolean desiredEnabled) {
+        if (!isAccessibilityServiceEnabled()) {
+            output.setText(
+                    "Сначала включи службу специальных возможностей:\n\n"
+                            + "AA Wireless Switch automation\n\n"
+                            + "После включения вернись сюда и повтори команду."
+            );
+            openAccessibilitySettings();
+            return;
+        }
+
+        getSharedPreferences(AaWirelessAccessibilityService.PREFS, MODE_PRIVATE)
+                .edit()
+                .putBoolean(AaWirelessAccessibilityService.KEY_PENDING, true)
+                .putBoolean(AaWirelessAccessibilityService.KEY_DESIRED_ENABLED, desiredEnabled)
+                .putLong("command_time", System.currentTimeMillis())
+                .putString(AaWirelessAccessibilityService.KEY_LAST_RESULT, "Command started")
+                .apply();
+
+        output.setText(
+                "Команда отправлена: "
+                        + (desiredEnabled ? "включить" : "выключить")
+                        + " Android Auto Wireless.\n\nОткрываю настройки Android Auto..."
+        );
+        openAndroidAutoSettings();
+    }
+
+    private boolean isAccessibilityServiceEnabled() {
+        ComponentName expected = new ComponentName(this, AaWirelessAccessibilityService.class);
+        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (enabled == null) {
+            return false;
+        }
+        String expectedShort = expected.flattenToShortString();
+        String expectedLong = expected.flattenToString();
+        String[] services = enabled.split(":");
+        for (String service : services) {
+            if (expectedShort.equalsIgnoreCase(service) || expectedLong.equalsIgnoreCase(service)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void openAndroidAutoSettings() {
+        Intent intent = new Intent(ANDROID_AUTO_SETTINGS_ACTION);
+        intent.setPackage(ANDROID_AUTO_PACKAGE);
+        intent.addCategory(Intent.CATEGORY_DEFAULT);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(intent);
+            return;
+        } catch (ActivityNotFoundException ignored) {
+            // Fall through to the standard app preferences action.
+        }
+
+        Intent preferences = new Intent(Intent.ACTION_APPLICATION_PREFERENCES);
+        preferences.setPackage(ANDROID_AUTO_PACKAGE);
+        preferences.addCategory(Intent.CATEGORY_DEFAULT);
+        preferences.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(preferences);
+            return;
+        } catch (ActivityNotFoundException ignored) {
+            // Fall through to app details as a last visible fallback.
+        }
+
+        Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        details.setData(Uri.parse("package:" + ANDROID_AUTO_PACKAGE));
+        startActivity(details);
     }
 
     private void saveSnapshot(String key) {
