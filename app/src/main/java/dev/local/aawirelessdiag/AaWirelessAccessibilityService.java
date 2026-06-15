@@ -1,6 +1,7 @@
 package dev.local.aawirelessdiag;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
@@ -136,7 +137,13 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
     private void closeSettingsAfterSuccess() {
         handler.postDelayed(
-                () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
+                () -> {
+                    Intent intent = new Intent(this, MainActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(intent);
+                },
                 CLOSE_SETTINGS_DELAY_MS
         );
     }
