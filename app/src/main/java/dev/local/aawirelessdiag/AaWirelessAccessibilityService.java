@@ -2,7 +2,6 @@ package dev.local.aawirelessdiag;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Path;
 import android.graphics.Rect;
@@ -172,13 +171,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
     private void closeSettingsAfterSuccess() {
         handler.postDelayed(
-                () -> {
-                    Intent intent = new Intent(this, MainActivity.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                            | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    startActivity(intent);
-                },
+                () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
                 CLOSE_SETTINGS_DELAY_MS
         );
     }
