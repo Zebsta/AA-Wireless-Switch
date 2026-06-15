@@ -1,8 +1,12 @@
 package dev.local.aawirelessdiag;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
@@ -14,6 +18,9 @@ import java.util.Locale;
 public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long COMMAND_TTL_MS = 45_000L;
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
+    private static final int OPEN_DEVELOPER_NOT_FOUND = 0;
+    private static final int OPEN_DEVELOPER_CLICKED = 1;
+    private static final int OPEN_DEVELOPER_SCROLLED = 2;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int attempts;
@@ -83,10 +90,16 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         SharedPreferences prefs = AutomationController.prefs(this);
         boolean desiredEnabled = prefs.getBoolean(AutomationController.KEY_DESIRED_ENABLED, true);
         if (!developerMenuOpened) {
-            if (openDeveloperMenu(root)) {
+            int developerAction = openDeveloperMenu(root);
+            if (developerAction == OPEN_DEVELOPER_CLICKED) {
                 developerMenuOpened = true;
                 root.recycle();
                 scheduleAttempt(800);
+                return;
+            }
+            if (developerAction == OPEN_DEVELOPER_SCROLLED) {
+                root.recycle();
+                scheduleAttempt(700);
                 return;
             }
             developerMenuOpened = true;
@@ -106,7 +119,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             return;
         }
 
-        boolean clicked = target.clickNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        boolean clicked = performClick(target.clickNode);
         root.recycle();
         if (clicked) {
             finish("Clicked Wireless Android Auto switch to " + (desiredEnabled ? "enable" : "disable"), desiredEnabled);
@@ -168,19 +181,21 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         );
     }
 
-    private boolean openDeveloperMenu(AccessibilityNodeInfo root) {
+    private int openDeveloperMenu(AccessibilityNodeInfo root) {
         AccessibilityNodeInfo label = findDeveloperMenuLabel(root);
         if (label == null) {
-            return false;
+            return scrollForward(root) ? OPEN_DEVELOPER_SCROLLED : OPEN_DEVELOPER_NOT_FOUND;
         }
         AccessibilityNodeInfo clickable = findClickableAncestor(label);
-        label.recycle();
-        if (clickable == null) {
-            return false;
+        boolean clicked;
+        if (clickable != null) {
+            clicked = performClick(clickable);
+            clickable.recycle();
+        } else {
+            clicked = tapNodeCenter(label);
         }
-        boolean clicked = clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-        clickable.recycle();
-        return clicked;
+        label.recycle();
+        return clicked ? OPEN_DEVELOPER_CLICKED : OPEN_DEVELOPER_NOT_FOUND;
     }
 
     private ToggleTarget findToggleTarget(AccessibilityNodeInfo root) {
@@ -307,6 +322,53 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             }
         }
         return null;
+    }
+
+    private boolean performClick(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return false;
+        }
+        if (node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            return true;
+        }
+        return tapNodeCenter(node);
+    }
+
+    private boolean tapNodeCenter(AccessibilityNodeInfo node) {
+        if (node == null || Build.VERSION.SDK_INT < 24) {
+            return false;
+        }
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        if (bounds.isEmpty()) {
+            return false;
+        }
+        Path path = new Path();
+        path.moveTo(bounds.centerX(), bounds.centerY());
+        GestureDescription gesture = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
+                .build();
+        return dispatchGesture(gesture, null, null);
+    }
+
+    private boolean scrollForward(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return false;
+        }
+        if (node.isScrollable() && node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) {
+            return true;
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            boolean scrolled = scrollForward(child);
+            if (child != null) {
+                child.recycle();
+            }
+            if (scrolled) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isSwitchClass(AccessibilityNodeInfo node) {
