@@ -12,6 +12,7 @@ import java.util.Locale;
 
 public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long COMMAND_TTL_MS = 30_000L;
+    private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int attempts;
@@ -81,6 +82,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
         if (target.checkedKnown && target.checked == desiredEnabled) {
             finish("Already " + (desiredEnabled ? "enabled" : "disabled"), desiredEnabled);
+            closeSettingsAfterSuccess();
             root.recycle();
             return;
         }
@@ -89,6 +91,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         root.recycle();
         if (clicked) {
             finish("Clicked Wireless Android Auto switch to " + (desiredEnabled ? "enable" : "disable"), desiredEnabled);
+            closeSettingsAfterSuccess();
         } else {
             retryOrFail("Switch click failed");
         }
@@ -129,6 +132,13 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 .edit()
                 .putString(AutomationController.KEY_LAST_RESULT, result)
                 .apply();
+    }
+
+    private void closeSettingsAfterSuccess() {
+        handler.postDelayed(
+                () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
+                CLOSE_SETTINGS_DELAY_MS
+        );
     }
 
     private ToggleTarget findToggleTarget(AccessibilityNodeInfo root) {
