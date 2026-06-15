@@ -12,11 +12,13 @@ import android.widget.Toast;
 import java.util.Locale;
 
 public class AaWirelessAccessibilityService extends AccessibilityService {
-    private static final long COMMAND_TTL_MS = 30_000L;
+    private static final long COMMAND_TTL_MS = 45_000L;
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int attempts;
+    private long activeCommandTime;
+    private boolean developerMenuOpened;
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -42,6 +44,11 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             return false;
         }
         long commandTime = prefs.getLong(AutomationController.KEY_COMMAND_TIME, 0L);
+        if (commandTime != activeCommandTime) {
+            activeCommandTime = commandTime;
+            attempts = 0;
+            developerMenuOpened = false;
+        }
         if (System.currentTimeMillis() - commandTime > COMMAND_TTL_MS) {
             prefs.edit()
                     .putBoolean(AutomationController.KEY_PENDING, false)
@@ -50,6 +57,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             AaWirelessWidgetProvider.updateAll(this);
             AaWirelessTileService.requestTileRefresh(this);
             attempts = 0;
+            developerMenuOpened = false;
             return false;
         }
         return true;
@@ -76,6 +84,12 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         boolean desiredEnabled = prefs.getBoolean(AutomationController.KEY_DESIRED_ENABLED, true);
         ToggleTarget target = findToggleTarget(root);
         if (target == null || target.clickNode == null) {
+            if (!developerMenuOpened && openDeveloperMenu(root)) {
+                developerMenuOpened = true;
+                root.recycle();
+                scheduleAttempt(800);
+                return;
+            }
             root.recycle();
             retryOrFail("Wireless Android Auto switch was not found");
             return;
@@ -113,6 +127,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 .apply();
         AutomationController.setLastKnownState(this, enabled, result);
         attempts = 0;
+        developerMenuOpened = false;
         Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
     }
 
@@ -125,6 +140,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         AaWirelessWidgetProvider.updateAll(this);
         AaWirelessTileService.requestTileRefresh(this);
         attempts = 0;
+        developerMenuOpened = false;
         Toast.makeText(this, result, Toast.LENGTH_SHORT).show();
     }
 
@@ -146,6 +162,21 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 },
                 CLOSE_SETTINGS_DELAY_MS
         );
+    }
+
+    private boolean openDeveloperMenu(AccessibilityNodeInfo root) {
+        AccessibilityNodeInfo label = findDeveloperMenuLabel(root);
+        if (label == null) {
+            return false;
+        }
+        AccessibilityNodeInfo clickable = findClickableAncestor(label);
+        label.recycle();
+        if (clickable == null) {
+            return false;
+        }
+        boolean clicked = clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        clickable.recycle();
+        return clicked;
     }
 
     private ToggleTarget findToggleTarget(AccessibilityNodeInfo root) {
@@ -209,6 +240,28 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         return null;
     }
 
+    private AccessibilityNodeInfo findDeveloperMenuLabel(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return null;
+        }
+        CharSequence text = node.getText();
+        CharSequence description = node.getContentDescription();
+        if (matchesDeveloperMenu(text) || matchesDeveloperMenu(description)) {
+            return AccessibilityNodeInfo.obtain(node);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo found = findDeveloperMenuLabel(child);
+            if (child != null) {
+                child.recycle();
+            }
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
     private boolean matchesWirelessAndroidAuto(CharSequence value) {
         if (value == null) {
             return false;
@@ -220,6 +273,16 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 || text.contains("wi-fi")
                 || text.contains("wifi");
         return mentionsAndroidAuto && mentionsWireless;
+    }
+
+    private boolean matchesDeveloperMenu(CharSequence value) {
+        if (value == null) {
+            return false;
+        }
+        String text = value.toString().toLowerCase(Locale.ROOT);
+        return text.contains("для разработ")
+                || text.contains("разработчик")
+                || text.contains("developer");
     }
 
     private AccessibilityNodeInfo findCheckableNode(AccessibilityNodeInfo node) {
