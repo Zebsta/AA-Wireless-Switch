@@ -86,13 +86,6 @@ enabled and the `Для разработчиков` menu item must be visible.
 
 ## Build
 
-Use this repository directory as the working directory for project files and
-generated artifacts:
-
-```bash
-cd /home/user/Distr/Git/AA-Wireless-Switch
-```
-
 Requirements:
 
 - JDK 17
