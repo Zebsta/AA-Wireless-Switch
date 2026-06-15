@@ -58,6 +58,12 @@ If the in-app diff is empty, run the ADB read-only diff from this repository:
 scripts/adb-readonly-diff.sh
 ```
 
+On Windows, run the PowerShell version:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\adb-readonly-diff.ps1
+```
+
 The script asks for two manual captures around the Android Auto Wireless
 checkbox toggle and writes a report under `captures/`. That directory is ignored
 by git.
