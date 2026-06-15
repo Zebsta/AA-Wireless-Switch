@@ -20,7 +20,7 @@ system settings. It only reads publicly accessible settings through
 4. Tap `1. Снять ДО`.
 5. Manually switch `Беспроводная связь с Android Auto`.
 6. Return to the app and tap `2. Снять ПОСЛЕ`.
-7. Tap `Показать diff`.
+7. Tap `3. Показать diff для отправки`.
 8. Send back the report text.
 
 ## Build

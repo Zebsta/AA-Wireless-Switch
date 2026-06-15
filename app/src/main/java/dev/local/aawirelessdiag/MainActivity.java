@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class MainActivity extends Activity {
+    private static final String APP_VERSION = "0.2.0";
     private static final String PREFS = "snapshots";
     private static final String KEY_BEFORE = "before";
     private static final String KEY_AFTER = "after";
@@ -73,8 +74,8 @@ public class MainActivity extends Activity {
 
         addButton(buttons, "1. Снять ДО", v -> saveSnapshot(KEY_BEFORE));
         addButton(buttons, "2. Снять ПОСЛЕ", v -> saveSnapshot(KEY_AFTER));
-        addButton(buttons, "Показать diff", v -> showDiff());
-        addButton(buttons, "Текущий снимок", v -> showCurrentSnapshot());
+        addButton(buttons, "3. Показать diff для отправки", v -> showDiff());
+        addButton(buttons, "Текущий полный снимок", v -> showCurrentSnapshot());
         addButton(buttons, "Копировать отчет", v -> copyReport());
         addButton(buttons, "Отправить отчет", v -> shareReport());
 
@@ -108,7 +109,7 @@ public class MainActivity extends Activity {
                         + "3. Нажми \"1. Снять ДО\".\n"
                         + "4. Вручную переключи чекбокс \"Беспроводная связь с Android Auto\".\n"
                         + "5. Вернись сюда и нажми \"2. Снять ПОСЛЕ\".\n"
-                        + "6. Нажми \"Показать diff\" и отправь отчет.\n\n"
+                        + "6. Нажми \"3. Показать diff для отправки\" и отправь отчет.\n\n"
                         + "Приложение не запрашивает опасные разрешения и не записывает системные настройки.\n"
         );
     }
@@ -116,7 +117,16 @@ public class MainActivity extends Activity {
     private void saveSnapshot(String key) {
         String snapshot = collectSnapshot();
         prefs.edit().putString(key, snapshot).apply();
-        output.setText(snapshot);
+        if (KEY_AFTER.equals(key) && !prefs.getString(KEY_BEFORE, "").isEmpty()) {
+            output.setText(buildDiffReport(prefs.getString(KEY_BEFORE, ""), snapshot));
+        } else {
+            output.setText(
+                    "Снимок ДО сохранен.\n\n"
+                            + "Теперь вручную переключи чекбокс \"Беспроводная связь с Android Auto\", "
+                            + "вернись сюда и нажми \"2. Снять ПОСЛЕ\".\n\n"
+                            + "Полный снимок скрыт, чтобы случайно не отправить не тот отчет."
+            );
+        }
         Toast.makeText(this, key.equals(KEY_BEFORE) ? "Снимок ДО сохранен" : "Снимок ПОСЛЕ сохранен", Toast.LENGTH_SHORT).show();
     }
 
@@ -153,7 +163,7 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         sb.append("AA Wireless Diagnostic snapshot\n");
         sb.append("time=").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(new Date())).append('\n');
-        sb.append("appVersion=0.1.0\n\n");
+        sb.append("appVersion=").append(APP_VERSION).append("\n\n");
 
         appendDeviceInfo(sb);
         appendPackageInfo(sb, "com.google.android.projection.gearhead", "Android Auto");
@@ -262,6 +272,10 @@ public class MainActivity extends Activity {
 
         StringBuilder sb = new StringBuilder();
         sb.append("AA Wireless Diagnostic diff\n\n");
+        appendSnapshotSummary(sb, "before", before);
+        appendSnapshotSummary(sb, "after", after);
+        sb.append('\n');
+
         sb.append("[changed]\n");
         int changed = 0;
         for (String key : keys) {
@@ -278,9 +292,31 @@ public class MainActivity extends Activity {
             sb.append("(none)\n");
         }
 
-        sb.append("\n[before_snapshot]\n").append(before);
-        sb.append("\n[after_snapshot]\n").append(after);
+        sb.append("\nЕсли [changed] пустой, переключатель Android Auto Wireless не виден через обычные ");
+        sb.append("Settings.Secure/Global/System и нужен следующий способ диагностики: ADB shell diff, ");
+        sb.append("Shizuku или root.\n");
         return sb.toString();
+    }
+
+    private void appendSnapshotSummary(StringBuilder sb, String name, String snapshot) {
+        sb.append('[').append(name).append("_summary]\n");
+        String[] lines = snapshot.split("\\r?\\n");
+        for (String line : lines) {
+            if (line.startsWith("time=")
+                    || line.startsWith("appVersion=")
+                    || line.startsWith("sdk=")
+                    || line.startsWith("release=")
+                    || line.startsWith("manufacturer=")
+                    || line.startsWith("brand=")
+                    || line.startsWith("model=")
+                    || line.startsWith("versionName=")
+                    || line.startsWith("versionCode=")
+                    || line.startsWith("global.__row_count=")
+                    || line.startsWith("secure.__row_count=")
+                    || line.startsWith("system.__row_count=")) {
+                sb.append(line).append('\n');
+            }
+        }
     }
 
     private Map<String, String> parseSettings(String snapshot) {
