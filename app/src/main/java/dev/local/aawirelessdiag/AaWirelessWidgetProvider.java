@@ -45,7 +45,6 @@ public class AaWirelessWidgetProvider extends AppWidgetProvider {
 
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_aa_wireless);
         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_title));
-        views.setImageViewResource(R.id.widget_icon, enabled ? R.drawable.controller_on : R.drawable.controller_off);
         if (pending) {
             views.setTextViewText(R.id.widget_state, context.getString(R.string.widget_pending));
         } else if (!known) {

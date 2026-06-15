@@ -6,13 +6,11 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.widget.CompoundButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
-    private ImageView controllerIcon;
     private Switch mainSwitch;
     private TextView status;
     private boolean binding;
@@ -41,22 +39,11 @@ public class MainActivity extends Activity {
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        controllerIcon = new ImageView(this);
-        controllerIcon.setAdjustViewBounds(true);
-        controllerIcon.setContentDescription(getString(R.string.main_switch_label));
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(220), dp(220));
-        iconParams.setMargins(0, dp(28), 0, dp(10));
-        root.addView(controllerIcon, iconParams);
-
         mainSwitch = new Switch(this);
         mainSwitch.setText(R.string.main_switch_label);
         mainSwitch.setTextAppearance(android.R.style.TextAppearance_Material_Title);
         mainSwitch.setGravity(Gravity.CENTER);
-        mainSwitch.setTextSize(22);
-        mainSwitch.setScaleX(1.45f);
-        mainSwitch.setScaleY(1.45f);
-        mainSwitch.setMinHeight(dp(64));
-        mainSwitch.setPadding(0, dp(18), 0, dp(22));
+        mainSwitch.setPadding(0, dp(28), 0, dp(18));
         mainSwitch.setOnCheckedChangeListener(this::onSwitchChanged);
         root.addView(mainSwitch, new LinearLayout.LayoutParams(-2, -2));
 
@@ -91,7 +78,6 @@ public class MainActivity extends Activity {
         binding = true;
         mainSwitch.setChecked(enabled);
         mainSwitch.setEnabled(true);
-        controllerIcon.setImageResource(enabled ? R.drawable.controller_on : R.drawable.controller_off);
         binding = false;
 
         if (!serviceEnabled) {
