@@ -25,6 +25,13 @@ system settings. It only reads publicly accessible settings through
 
 ## Build
 
+Use this repository directory as the working directory for project files and
+generated artifacts:
+
+```bash
+cd /home/user/Distr/Git/AA-Wireless-Switch
+```
+
 Requirements:
 
 - JDK 17

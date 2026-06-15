@@ -4,13 +4,29 @@ local.properties
 
 */build/
 
+.android/
+.android-sdk/
+.gradle-user-home/
+.local-tools/
+.tmp/
+tmp/
+
 *.apk
 *.ap_
 *.aab
 *.dex
 *.class
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.log
 
 .idea/
 *.iml
 
 .DS_Store
+
+artifacts/
+captures/
+reports/
