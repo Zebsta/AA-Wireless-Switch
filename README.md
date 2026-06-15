@@ -49,3 +49,15 @@ APK output:
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
+
+## Second-stage read-only diagnosis
+
+If the in-app diff is empty, run the ADB read-only diff from this repository:
+
+```bash
+scripts/adb-readonly-diff.sh
+```
+
+The script asks for two manual captures around the Android Auto Wireless
+checkbox toggle and writes a report under `captures/`. That directory is ignored
+by git.
