@@ -80,8 +80,9 @@ Settings > Accessibility > Installed apps > AA Wireless Switch automation
 5. Verify that the `Wireless Android Auto` / `Беспроводная связь с Android Auto`
    option exists there.
 
-The app can only automate this menu if Android Auto developer mode is already
-enabled and the `Для разработчиков` menu item is visible.
+The app always tries to open this developer menu first and then toggles
+`Wireless Android Auto` there. Android Auto developer mode must already be
+enabled and the `Для разработчиков` menu item must be visible.
 
 ## Build
 

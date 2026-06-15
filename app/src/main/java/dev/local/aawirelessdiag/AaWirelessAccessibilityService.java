@@ -82,14 +82,18 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
         SharedPreferences prefs = AutomationController.prefs(this);
         boolean desiredEnabled = prefs.getBoolean(AutomationController.KEY_DESIRED_ENABLED, true);
-        ToggleTarget target = findToggleTarget(root);
-        if (target == null || target.clickNode == null) {
-            if (!developerMenuOpened && openDeveloperMenu(root)) {
+        if (!developerMenuOpened) {
+            if (openDeveloperMenu(root)) {
                 developerMenuOpened = true;
                 root.recycle();
                 scheduleAttempt(800);
                 return;
             }
+            developerMenuOpened = true;
+        }
+
+        ToggleTarget target = findToggleTarget(root);
+        if (target == null || target.clickNode == null) {
             root.recycle();
             retryOrFail("Wireless Android Auto switch was not found");
             return;
