@@ -104,6 +104,17 @@ APK output:
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Logo Source
+
+The original generated logo image is kept at:
+
+```text
+reference/aa-wireless-logo-original.png
+```
+
+It is a reference asset only. Android builds use the optimized resources under
+`app/src/main/res/`, so the reference PNG is not packaged into the APK.
+
 ## Second-stage read-only diagnosis
 
 If the in-app diff is empty, run the ADB read-only diff from this repository:
