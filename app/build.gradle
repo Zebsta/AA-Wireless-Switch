@@ -3,14 +3,15 @@ plugins {
 }
 
 android {
-    namespace "dev.local.aawirelessdiag"
+    namespace "dev.local.aawirelessswitch"
     compileSdk 35
 
     defaultConfig {
-        applicationId "dev.local.aawirelessdiag"
+        applicationId "dev.local.aawirelessswitch"
         minSdk 23
         targetSdk 35
         versionCode 4
         versionName "0.4.0"
+        setProperty("archivesBaseName", "AA Wireless Switch")
     }
 }

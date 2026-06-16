@@ -1,4 +1,4 @@
-package dev.local.aawirelessdiag;
+package dev.local.aawirelessswitch;
 
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -10,7 +10,7 @@ import android.content.SharedPreferences;
 import android.widget.RemoteViews;
 
 public class AaWirelessWidgetProvider extends AppWidgetProvider {
-    static final String ACTION_TOGGLE = "dev.local.aawirelessdiag.action.WIDGET_TOGGLE";
+    static final String ACTION_TOGGLE = "dev.local.aawirelessswitch.action.WIDGET_TOGGLE";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] appWidgetIds) {

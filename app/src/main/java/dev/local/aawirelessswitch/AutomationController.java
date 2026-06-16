@@ -1,4 +1,4 @@
-package dev.local.aawirelessdiag;
+package dev.local.aawirelessswitch;
 
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;

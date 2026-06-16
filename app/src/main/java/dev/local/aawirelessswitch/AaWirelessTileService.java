@@ -1,4 +1,4 @@
-package dev.local.aawirelessdiag;
+package dev.local.aawirelessswitch;
 
 import android.app.PendingIntent;
 import android.content.Intent;

@@ -1,4 +1,4 @@
-package dev.local.aawirelessdiag;
+package dev.local.aawirelessswitch;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;

@@ -1,88 +1,54 @@
 # AA Wireless Switch
 
-Personal Android app for investigating and later toggling Android Auto wireless mode.
+Personal Android app for toggling Android Auto wireless mode from a main switch,
+a home-screen widget, and a Quick Settings tile.
 
-Current state: experimental AccessibilityService-based switch. The app exposes
-a single main toggle, a home-screen widget, and a Quick Settings tile. The
-accessibility path opens Android Auto settings and clicks the Wireless Android
-Auto switch in the same UI a user would operate manually.
+The app is not intended for Play Store publication. It is built for personal use
+on phones where Android Auto exposes `Wireless Android Auto` /
+`Беспроводная связь с Android Auto` in Android Auto developer settings.
 
-## Current findings
+## How It Works
 
-The Android Auto Wireless checkbox changes the user-0 component state of:
+Android does not allow a normal app, nor `adb shell`, to directly change the
+Android Auto component that backs the wireless setting. The working method is an
+AccessibilityService that performs the same UI steps as a user:
 
-```text
-com.google.android.projection.gearhead/com.google.android.apps.auto.wireless.bluetooth.WifiBluetoothReceiver
-```
+1. Open Android Auto settings.
+2. Open the three-dot overflow menu.
+3. Open `Developer settings` / `Для разработчиков`.
+4. Toggle `Wireless Android Auto` / `Беспроводная связь с Android Auto`.
+5. Return to the home screen.
 
-Observed mapping:
+The user must explicitly enable the Accessibility service once.
 
-```text
-enabled  = Android Auto Wireless enabled
-disabled = Android Auto Wireless disabled
-```
+## Phone Setup
 
-Direct ADB shell control is blocked on the tested Samsung Android 16 device:
+Enable Android Auto developer mode:
 
-```text
-java.lang.SecurityException: Shell cannot change component state
-```
+1. Open Android Auto settings on the phone.
+2. Scroll to the bottom.
+3. Tap `Version` several times until developer mode is enabled.
+4. Open the three-dot menu.
+5. Confirm that `Developer settings` / `Для разработчиков` is visible.
+6. Open it and confirm that `Wireless Android Auto` /
+   `Беспроводная связь с Android Auto` is present.
 
-Because Shizuku normally executes with shell-level privileges, this also rules
-out a Shizuku implementation based on `pm enable` / `pm disable-user` for this
-component. Remaining implementation paths are root/system privileges or
-Accessibility automation of the Android Auto settings UI.
+Enable the app Accessibility service:
 
-## Safety
+1. Install and open `AA Wireless Switch`.
+2. Tap the main switch.
+3. Android should open Accessibility settings.
+4. Enable `AA Wireless Switch automation`.
+5. Return to the app and use the switch again.
 
-The app uses Android Accessibility only to operate the Android Auto settings UI
-after an explicit user action from the main switch, widget, or Quick Settings
-tile. The diagnostic scripts are read-only and do not write system settings.
-
-## How to use
-
-1. Install the APK on the phone.
-2. Open the app.
-3. Turn on the main switch.
-4. If Accessibility is not enabled yet, Android opens Accessibility settings.
-5. Enable `AA Wireless Switch automation`.
-6. Return to the app and use the switch again.
-
-The home-screen widget can be added from the launcher widget picker. The Quick
-Settings tile can be added from the tile editor in the notification shade.
-
-This method depends on Android Auto UI text and layout. It may need adjustment
-for different languages or Android Auto versions.
-
-## Enable Accessibility Service
-
-1. Open `AA Wireless Switch`.
-2. Turn on the main switch.
-3. Android should open Accessibility settings automatically.
-4. Open `Installed apps` or the equivalent Accessibility services list.
-5. Select `AA Wireless Switch automation`.
-6. Enable the service and confirm Android's warning.
-7. Return to `AA Wireless Switch`.
-
-On Samsung devices the path is usually:
+On Samsung devices the usual path is:
 
 ```text
 Settings > Accessibility > Installed apps > AA Wireless Switch automation
 ```
 
-## Enable Android Auto Developer Mode
-
-1. Open Android Auto settings on the phone.
-2. Scroll to the bottom and tap `Version` several times until developer mode is
-   enabled.
-3. Open the three-dot menu in Android Auto settings.
-4. Select `Developer settings` / `Для разработчиков`.
-5. Verify that the `Wireless Android Auto` / `Беспроводная связь с Android Auto`
-   option exists there.
-
-The app always tries to open this developer menu first and then toggles
-`Wireless Android Auto` there. Android Auto developer mode must already be
-enabled and the `Для разработчиков` menu item must be visible.
+The home-screen widget is added from the launcher widget picker. The Quick
+Settings tile is added from the notification shade tile editor.
 
 ## Build
 
@@ -101,38 +67,23 @@ gradle assembleDebug
 APK output:
 
 ```text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/debug/AA Wireless Switch-debug.apk
 ```
 
-## Logo Source
+## Repository Contents
 
-The original generated logo image is kept at:
+- `app/src/main/java/dev/local/aawirelessswitch/` - app source code.
+- `app/src/main/res/` - Android resources, launcher icon, widget layout, tile
+  icon assets, strings, and AccessibilityService config.
+- `reference/aa-wireless-logo-original.png` - original generated logo reference.
+  This file is not packaged into the APK.
+- `AI_CONTEXT.md` - implementation context for future maintainers or AI coding
+  agents.
 
-```text
-reference/aa-wireless-logo-original.png
-```
+## Important Notes
 
-It is a reference asset only. Android builds use the optimized resources under
-`app/src/main/res/`, so the reference PNG is not packaged into the APK.
-
-## Second-stage read-only diagnosis
-
-If the in-app diff is empty, run the ADB read-only diff from this repository:
-
-```bash
-scripts/adb-readonly-diff.sh
-```
-
-On Windows, run the PowerShell version:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\adb-readonly-diff.ps1
-```
-
-The PowerShell script looks for `adb.exe` in PATH, `C:\platform-tools`, the
-standard Android SDK location, and `platform-tools\adb.exe` next to the script
-or repository root.
-
-The script asks for two manual captures around the Android Auto Wireless
-checkbox toggle and writes a report under `captures/`. That directory is ignored
-by git.
+- The implementation depends on Android Auto UI text and layout. It may need
+  adjustment for other languages, OEM skins, or Android Auto versions.
+- The package/application id is `dev.local.aawirelessswitch`.
+- If an older development APK using another package id was installed, uninstall
+  it before installing this final package.
