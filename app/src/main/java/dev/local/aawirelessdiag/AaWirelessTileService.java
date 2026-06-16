@@ -43,7 +43,7 @@ public class AaWirelessTileService extends TileService {
         boolean pending = prefs.getBoolean(AutomationController.KEY_PENDING, false);
 
         tile.setLabel(getString(R.string.tile_label));
-        tile.setIcon(Icon.createWithResource(this, R.drawable.aa_logo_black));
+        tile.setIcon(Icon.createWithResource(this, R.drawable.aa_logo_black_tile));
         if (Build.VERSION.SDK_INT >= 29) {
             if (pending) {
                 tile.setSubtitle(getString(R.string.tile_pending));
