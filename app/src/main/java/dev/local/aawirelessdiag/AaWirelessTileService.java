@@ -4,7 +4,6 @@ import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
@@ -43,7 +42,6 @@ public class AaWirelessTileService extends TileService {
         boolean pending = prefs.getBoolean(AutomationController.KEY_PENDING, false);
 
         tile.setLabel(getString(R.string.tile_label));
-        tile.setIcon(Icon.createWithResource(this, R.drawable.ic_aa_bluetooth_logo));
         if (Build.VERSION.SDK_INT >= 29) {
             if (pending) {
                 tile.setSubtitle(getString(R.string.tile_pending));
