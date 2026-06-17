@@ -17,6 +17,8 @@ import java.util.Locale;
 public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long COMMAND_TTL_MS = 45_000L;
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
+    private static final long CLOSE_SETTINGS_BACK_STEP_MS = 450L;
+    private static final long CLOSE_SETTINGS_HOME_STEP_MS = 650L;
     private static final int OPEN_DEVELOPER_NOT_FOUND = 0;
     private static final int OPEN_DEVELOPER_CLICKED = 1;
 
@@ -184,10 +186,16 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     }
 
     private void closeSettingsAfterSuccess() {
-        handler.postDelayed(
-                () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
-                CLOSE_SETTINGS_DELAY_MS
-        );
+        handler.postDelayed(() -> {
+            performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+            handler.postDelayed(() -> {
+                performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+                handler.postDelayed(
+                        () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
+                        CLOSE_SETTINGS_HOME_STEP_MS
+                );
+            }, CLOSE_SETTINGS_BACK_STEP_MS);
+        }, CLOSE_SETTINGS_DELAY_MS);
     }
 
     private boolean openOverflowMenu(AccessibilityNodeInfo root) {
