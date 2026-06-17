@@ -17,7 +17,6 @@ import java.util.Locale;
 public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long COMMAND_TTL_MS = 45_000L;
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
-    private static final long CLOSE_SETTINGS_RECENTS_STEP_MS = 700L;
     private static final long CLOSE_SETTINGS_DISMISS_STEP_MS = 900L;
     private static final long CLOSE_SETTINGS_FINAL_HOME_STEP_MS = 450L;
     private static final int OPEN_DEVELOPER_NOT_FOUND = 0;
@@ -187,23 +186,18 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     }
 
     private void closeSettingsAfterSuccess() {
-        handler.postDelayed(() -> {
-            performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME);
-            dismissAndroidAutoRecentTaskAfterHome();
-        }, CLOSE_SETTINGS_DELAY_MS);
+        handler.postDelayed(this::dismissAndroidAutoRecentTaskFromRecents, CLOSE_SETTINGS_DELAY_MS);
     }
 
-    private void dismissAndroidAutoRecentTaskAfterHome() {
+    private void dismissAndroidAutoRecentTaskFromRecents() {
+        performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS);
         handler.postDelayed(() -> {
-            performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS);
-            handler.postDelayed(() -> {
-                dismissAndroidAutoRecentTask();
-                handler.postDelayed(
-                        () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
-                        CLOSE_SETTINGS_FINAL_HOME_STEP_MS
-                );
-            }, CLOSE_SETTINGS_DISMISS_STEP_MS);
-        }, CLOSE_SETTINGS_RECENTS_STEP_MS);
+            dismissAndroidAutoRecentTask();
+            handler.postDelayed(
+                    () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
+                    CLOSE_SETTINGS_FINAL_HOME_STEP_MS
+            );
+        }, CLOSE_SETTINGS_DISMISS_STEP_MS);
     }
 
     private void dismissAndroidAutoRecentTask() {
