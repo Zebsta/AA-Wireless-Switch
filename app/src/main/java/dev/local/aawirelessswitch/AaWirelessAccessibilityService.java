@@ -17,8 +17,6 @@ import java.util.Locale;
 public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long COMMAND_TTL_MS = 45_000L;
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
-    private static final long CLOSE_SETTINGS_BACK_STEP_MS = 450L;
-    private static final long CLOSE_SETTINGS_HOME_STEP_MS = 650L;
     private static final long CLOSE_SETTINGS_RECENTS_STEP_MS = 700L;
     private static final long CLOSE_SETTINGS_DISMISS_STEP_MS = 900L;
     private static final long CLOSE_SETTINGS_FINAL_HOME_STEP_MS = 450L;
@@ -190,14 +188,8 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
     private void closeSettingsAfterSuccess() {
         handler.postDelayed(() -> {
-            performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
-            handler.postDelayed(() -> {
-                performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
-                handler.postDelayed(() -> {
-                    performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME);
-                    dismissAndroidAutoRecentTaskAfterHome();
-                }, CLOSE_SETTINGS_HOME_STEP_MS);
-            }, CLOSE_SETTINGS_BACK_STEP_MS);
+            performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME);
+            dismissAndroidAutoRecentTaskAfterHome();
         }, CLOSE_SETTINGS_DELAY_MS);
     }
 
