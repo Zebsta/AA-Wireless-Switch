@@ -16,7 +16,11 @@ import java.util.Locale;
 
 public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long COMMAND_TTL_MS = 45_000L;
-    private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
+    private static final long EVENT_RETRY_DELAY_MS = 120L;
+    private static final long DEVELOPER_MENU_OPEN_DELAY_MS = 450L;
+    private static final long OVERFLOW_MENU_OPEN_DELAY_MS = 400L;
+    private static final long RETRY_DELAY_MS = 250L;
+    private static final long CLOSE_SETTINGS_DELAY_MS = 350L;
     private static final int OPEN_DEVELOPER_NOT_FOUND = 0;
     private static final int OPEN_DEVELOPER_CLICKED = 1;
 
@@ -29,7 +33,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (hasPendingCommand()) {
-            scheduleAttempt(250);
+            scheduleAttempt(EVENT_RETRY_DELAY_MS);
         }
     }
 
@@ -96,7 +100,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 developerMenuOpened = true;
                 overflowMenuOpened = false;
                 root.recycle();
-                scheduleAttempt(800);
+                scheduleAttempt(DEVELOPER_MENU_OPEN_DELAY_MS);
                 return;
             }
 
@@ -104,7 +108,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 if (openOverflowMenu(root)) {
                     overflowMenuOpened = true;
                     root.recycle();
-                    scheduleAttempt(700);
+                    scheduleAttempt(OVERFLOW_MENU_OPEN_DELAY_MS);
                     return;
                 }
                 root.recycle();
@@ -144,7 +148,7 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
 
     private void retryOrFail(String reason) {
         if (attempts < 20) {
-            scheduleAttempt(500);
+            scheduleAttempt(RETRY_DELAY_MS);
             return;
         }
         fail(reason);
