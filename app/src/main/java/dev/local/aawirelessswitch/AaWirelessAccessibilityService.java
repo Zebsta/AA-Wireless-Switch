@@ -19,6 +19,9 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
     private static final long CLOSE_SETTINGS_DELAY_MS = 700L;
     private static final long CLOSE_SETTINGS_BACK_STEP_MS = 450L;
     private static final long CLOSE_SETTINGS_HOME_STEP_MS = 650L;
+    private static final long CLOSE_SETTINGS_RECENTS_STEP_MS = 700L;
+    private static final long CLOSE_SETTINGS_DISMISS_STEP_MS = 900L;
+    private static final long CLOSE_SETTINGS_FINAL_HOME_STEP_MS = 450L;
     private static final int OPEN_DEVELOPER_NOT_FOUND = 0;
     private static final int OPEN_DEVELOPER_CLICKED = 1;
 
@@ -190,12 +193,51 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
             performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
             handler.postDelayed(() -> {
                 performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
-                handler.postDelayed(
-                        () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
-                        CLOSE_SETTINGS_HOME_STEP_MS
-                );
+                handler.postDelayed(() -> {
+                    performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME);
+                    dismissAndroidAutoRecentTaskAfterHome();
+                }, CLOSE_SETTINGS_HOME_STEP_MS);
             }, CLOSE_SETTINGS_BACK_STEP_MS);
         }, CLOSE_SETTINGS_DELAY_MS);
+    }
+
+    private void dismissAndroidAutoRecentTaskAfterHome() {
+        handler.postDelayed(() -> {
+            performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS);
+            handler.postDelayed(() -> {
+                dismissAndroidAutoRecentTask();
+                handler.postDelayed(
+                        () -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME),
+                        CLOSE_SETTINGS_FINAL_HOME_STEP_MS
+                );
+            }, CLOSE_SETTINGS_DISMISS_STEP_MS);
+        }, CLOSE_SETTINGS_RECENTS_STEP_MS);
+    }
+
+    private void dismissAndroidAutoRecentTask() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) {
+            return;
+        }
+        AccessibilityNodeInfo androidAutoNode = findAndroidAutoNode(root);
+        if (androidAutoNode == null) {
+            root.recycle();
+            return;
+        }
+
+        AccessibilityNodeInfo dismissable = findDismissableAncestor(androidAutoNode);
+        if (dismissable != null) {
+            dismissable.performAction(AccessibilityNodeInfo.ACTION_DISMISS);
+            dismissable.recycle();
+        } else {
+            AccessibilityNodeInfo swipeable = findSwipeableTaskAncestor(androidAutoNode, root);
+            if (swipeable != null) {
+                swipeNodeUp(swipeable);
+                swipeable.recycle();
+            }
+        }
+        androidAutoNode.recycle();
+        root.recycle();
     }
 
     private boolean openOverflowMenu(AccessibilityNodeInfo root) {
@@ -325,6 +367,28 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         return null;
     }
 
+    private AccessibilityNodeInfo findAndroidAutoNode(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return null;
+        }
+        CharSequence text = node.getText();
+        CharSequence description = node.getContentDescription();
+        if (matchesAndroidAuto(text) || matchesAndroidAuto(description)) {
+            return AccessibilityNodeInfo.obtain(node);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo found = findAndroidAutoNode(child);
+            if (child != null) {
+                child.recycle();
+            }
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
     private AccessibilityNodeInfo findTopRightClickableNode(AccessibilityNodeInfo root) {
         Rect rootBounds = new Rect();
         root.getBoundsInScreen(rootBounds);
@@ -406,6 +470,14 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
                 || text.contains("menu");
     }
 
+    private boolean matchesAndroidAuto(CharSequence value) {
+        if (value == null) {
+            return false;
+        }
+        String text = value.toString().toLowerCase(Locale.ROOT);
+        return text.contains("android auto");
+    }
+
     private boolean matchesDeveloperMenu(CharSequence value) {
         if (value == null) {
             return false;
@@ -436,6 +508,72 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         return null;
     }
 
+    private AccessibilityNodeInfo findDismissableAncestor(AccessibilityNodeInfo node) {
+        AccessibilityNodeInfo current = AccessibilityNodeInfo.obtain(node);
+        for (int i = 0; i < 10 && current != null; i++) {
+            if (supportsAction(current, AccessibilityNodeInfo.ACTION_DISMISS)) {
+                return current;
+            }
+            AccessibilityNodeInfo parent = current.getParent();
+            current.recycle();
+            current = parent;
+        }
+        return null;
+    }
+
+    private AccessibilityNodeInfo findSwipeableTaskAncestor(
+            AccessibilityNodeInfo node,
+            AccessibilityNodeInfo root
+    ) {
+        Rect rootBounds = new Rect();
+        root.getBoundsInScreen(rootBounds);
+        if (rootBounds.isEmpty()) {
+            return AccessibilityNodeInfo.obtain(node);
+        }
+
+        AccessibilityNodeInfo best = null;
+        Rect bestBounds = new Rect();
+        AccessibilityNodeInfo current = AccessibilityNodeInfo.obtain(node);
+        for (int i = 0; i < 10 && current != null; i++) {
+            Rect bounds = new Rect();
+            current.getBoundsInScreen(bounds);
+            if (isReasonableRecentTaskBounds(bounds, rootBounds)
+                    && bounds.width() * bounds.height() > bestBounds.width() * bestBounds.height()) {
+                if (best != null) {
+                    best.recycle();
+                }
+                best = AccessibilityNodeInfo.obtain(current);
+                bestBounds.set(bounds);
+            }
+            AccessibilityNodeInfo parent = current.getParent();
+            current.recycle();
+            current = parent;
+        }
+        return best != null ? best : AccessibilityNodeInfo.obtain(node);
+    }
+
+    private boolean isReasonableRecentTaskBounds(Rect bounds, Rect rootBounds) {
+        if (bounds.isEmpty()) {
+            return false;
+        }
+        int minSize = Math.round(96f * getResources().getDisplayMetrics().density);
+        if (bounds.width() < minSize || bounds.height() < minSize) {
+            return false;
+        }
+        long area = (long) bounds.width() * bounds.height();
+        long rootArea = (long) rootBounds.width() * rootBounds.height();
+        return area < rootArea * 9 / 10;
+    }
+
+    private boolean supportsAction(AccessibilityNodeInfo node, int actionId) {
+        for (AccessibilityNodeInfo.AccessibilityAction action : node.getActionList()) {
+            if (action.getId() == actionId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean performClick(AccessibilityNodeInfo node) {
         if (node == null) {
             return false;
@@ -459,6 +597,24 @@ public class AaWirelessAccessibilityService extends AccessibilityService {
         path.moveTo(bounds.centerX(), bounds.centerY());
         GestureDescription gesture = new GestureDescription.Builder()
                 .addStroke(new GestureDescription.StrokeDescription(path, 0, 80))
+                .build();
+        return dispatchGesture(gesture, null, null);
+    }
+
+    private boolean swipeNodeUp(AccessibilityNodeInfo node) {
+        if (node == null || Build.VERSION.SDK_INT < 24) {
+            return false;
+        }
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        if (bounds.isEmpty()) {
+            return false;
+        }
+        Path path = new Path();
+        path.moveTo(bounds.centerX(), bounds.centerY());
+        path.lineTo(bounds.centerX(), bounds.top + bounds.height() * 0.15f);
+        GestureDescription gesture = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, 220))
                 .build();
         return dispatchGesture(gesture, null, null);
     }
